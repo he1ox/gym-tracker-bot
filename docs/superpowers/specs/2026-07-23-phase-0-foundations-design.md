@@ -121,9 +121,11 @@ en el día siguiente UTC. Incluye comparador para ordenar claves cronológicamen
 ### `volume.ts`
 
 `weeklyVolumeByMuscleGroup(sets, muscleGroupByExerciseId, { weekKey, timeZone })`
-→ `Map<MuscleGroup, number>`: conteo de series efectivas del ejercicio cuya semana ISO
-coincide con `weekKey`. La comparación "esta semana vs. la anterior" del dashboard son
-dos invocaciones con claves distintas.
+→ `Map<MuscleGroup, number>`: conteo de series efectivas cuya semana ISO coincide con
+`weekKey`, agrupado por músculo. El mapa solo contiene grupos con al menos una serie;
+rellenar ceros para los 17 grupos es responsabilidad de la capa de presentación. La
+comparación "esta semana vs. la anterior" del dashboard son dos invocaciones con claves
+distintas.
 
 ### `one-rep-max.ts`
 
@@ -143,7 +145,8 @@ igualar el máximo no es récord. Devuelve el 1RM nuevo y el anterior para el me
 
 `detectStagnation(sets, { weeks = 3, timeZone, now }): StagnationResult`
 
-Algoritmo, para un ejercicio:
+Opera sobre las series de **un solo ejercicio**; recorrer el catálogo y agregar los
+resultados es responsabilidad del llamador. Algoritmo:
 
 1. Filtrar series efectivas y agruparlas por semana ISO (en `timeZone`).
 2. Calcular el mejor 1RM estimado de cada semana entrenada.
@@ -160,9 +163,9 @@ Reglas derivadas:
 - Las semanas calendario sin entrenar ese ejercicio no cuentan (spec §5).
 - La semana actual cuenta como entrenada si tiene al menos una serie efectiva.
 
-Devuelve, por ejercicio estancado: clave de semana del récord, 1RM del récord, número
-de semanas entrenadas sin superarlo y mejor 1RM del periodo estancado — lo que la
-alerta del dashboard necesita para ser accionable.
+Si el ejercicio está estancado, el resultado incluye: clave de semana del récord, 1RM
+del récord, número de semanas entrenadas sin superarlo y mejor 1RM del periodo
+estancado — lo que la alerta del dashboard necesita para ser accionable.
 
 ### `set-parser.ts`
 
@@ -177,6 +180,9 @@ Gramática (siempre peso primero):
 - Tolerante a: espacios alrededor de la `x`, mayúsculas/minúsculas, coma decimal
   (`32,5x10` ≡ `32.5x10`), sufijo `kg` opcional, espacios múltiples.
 - `rpe` acepta decimales (`rpe 8.5`, `rpe8,5`).
+- Validación semántica dentro del parser: `peso > 0`, `reps ≥ 1` (entero),
+  `rpe` entre 1 y 10 si está presente. Violar cualquiera produce `{ ok: false }` con su
+  código de razón.
 - El nombre de ejercicio se devuelve como texto crudo (`exerciseName?: string`); el
   matching contra el catálogo es responsabilidad de la Fase 1, no del parser.
 - Retorno: unión discriminada
