@@ -24,3 +24,7 @@ Registro del porqué. El qué vive en `SPEC.md`; el diseño de cada fase en `doc
   la zona horaria vive en `users.timezone` (IANA).
 - **`detectStagnation` no recibe `now`**: el diseño lo listaba, pero el algoritmo solo cuenta
   semanas presentes en los datos; un parámetro sin uso es superficie de confusión.
+- **Supresión dirigida del `ExperimentalWarning` de `node:sqlite` en los tests** (vía
+  `--disable-warning=ExperimentalWarning` en los workers de Vitest): en Node 24 el módulo ya
+  no exige flag pero sigue emitiendo el warning; silenciarlo de forma dirigida mantiene la
+  salida de tests limpia sin ocultar otros warnings.
