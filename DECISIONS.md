@@ -22,3 +22,5 @@ Registro del porqué. El qué vive en `SPEC.md`; el diseño de cada fase en `doc
   drizzle-orm no está garantizado y el runner propio es trivial, auditable y sin deps extra.
 - **PKs enteros autoincrementales** (SQLite local, un escritor) y **timestamps epoch-ms UTC**;
   la zona horaria vive en `users.timezone` (IANA).
+- **`detectStagnation` no recibe `now`**: el diseño lo listaba, pero el algoritmo solo cuenta
+  semanas presentes en los datos; un parámetro sin uso es superficie de confusión.

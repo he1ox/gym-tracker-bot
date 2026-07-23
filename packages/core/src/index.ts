@@ -5,3 +5,4 @@ export * from './tonnage';
 export * from './one-rep-max';
 export * from './records';
 export * from './volume';
+export * from './stagnation';
