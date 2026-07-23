@@ -7,3 +7,4 @@ export * from './records';
 export * from './volume';
 export * from './stagnation';
 export * from './set-parser';
+export * from './rest';
