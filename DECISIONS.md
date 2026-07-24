@@ -41,3 +41,23 @@ Registro del porqué. El qué vive en `SPEC.md`; el diseño de cada fase en `doc
 - **Usuario creado en el primer contacto permitido**, no en `/start`**: el middleware `auth` crea
   la fila en la BD la primera vez que un id autorizado toca cualquier update (callback, comando,
   etc.). Idempotente y garantiza que `ctx.user` nunca es undefined en handlers posteriores.
+- **`@grammyjs/conversations`** para el wizard lineal de `/routines` (mandado por SPEC §3);
+  motor de replay, todos los efectos vía `conversation.external`.
+- **`routineWizard` tipa su `ctx` interior como `Context` (grammY base), no `CustomContext`**:
+  el motor de replay rehidrata el contexto en cada `wait`/resume sin pasarlo por los
+  middlewares exteriores (`auth`, `conversations()`), así que nunca lleva `.user` ni
+  `.conversation` poblados; tiparlo como `CustomContext` compilaría pero mentiría sobre el
+  runtime. `userId` se captura una única vez con `conversation.external((outerCtx) => ...)`,
+  usando el ctx EXTERIOR (con `.user`) que ese callback sí recibe.
+- **`createConversation(..., { plugins: [...] })` reenvía los transformers de `bot.api` al
+  `ctx.api` que el wizard rehidrata en cada replay**: `@grammyjs/conversations` construye una
+  `Api` nueva por replay a partir de `token`+`options` (ver `hydrateContext` en su
+  `plugin.js`) y no copia los transformers instalados con `bot.api.config.use(...)`, a
+  diferencia de `Bot.handleUpdate` (que sí los copia explícitamente, comentario "configure it
+  with the same transformers as bot.api" en `grammy/out/bot.js`). Sin este reenvío, cualquier
+  llamada a la API hecha desde dentro del wizard (p. ej. `ctx.reply`) escapa a la red real —
+  en los tests de `routines-wizard.test.ts` fallaba con `404 Not Found` contra Telegram. El
+  `plugins` es una lista de middleware que corre en el `ctx` rehidratado antes de cada paso
+  del wizard; no depende de nada test-only, así que también aplica en producción a
+  transformers legítimos (rate limiting, logging) sin cambiar el comportamiento cuando no hay
+  ninguno instalado.

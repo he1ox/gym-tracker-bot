@@ -6,6 +6,7 @@ import { renderActive, registerCapture } from './capture';
 import type { CustomContext } from './context';
 import { dedup } from './dedup';
 import { createRestTimers } from './rest-timer';
+import { registerRoutines } from './routines-wizard';
 
 export interface BotDeps {
   allowedTelegramIds: number[];
@@ -23,7 +24,8 @@ export function createBot(
   bot.use(dedup(db));
   bot.use(auth(db, config));
 
-  // --- Fase 1: registrar aquí /routines (Task 15) y /last (Task 16), ANTES de la captura. ---
+  // --- Fase 1: /routines antes de la captura; /last se añade en la Task 16 ---
+  registerRoutines(bot, db, config);
 
   const restTimers = createRestTimers({
     send: async (chatId, text) => (await bot.api.sendMessage(chatId, text)).message_id,

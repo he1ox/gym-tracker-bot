@@ -61,6 +61,29 @@ export const T = {
   previousRecord(kg: string): string {
     return ` (antes ${kg} kg)`;
   },
+
+  // Wizard de /routines (Task 15)
+  noRoutines: 'No tienes rutinas todavía.',
+  routinesList: 'Tus rutinas (pulsa una para activarla):',
+  newRoutineButton: '➕ Nueva rutina',
+  routineActivated: 'Rutina activada.',
+  doneButton: '✅ Listo',
+  skipButton: '⏭ Saltar',
+  createOwnButton: '➕ Crear ejercicio propio',
+  routineAskName: 'Nombre de la nueva rutina:',
+  routineAskDay: 'Escribe el nombre de un día (o pulsa Listo para terminar):',
+  routineNeedOneDay: 'Añade al menos un día antes de terminar.',
+  dayAskExercise: 'Busca un ejercicio por nombre (o pulsa Listo para cerrar el día):',
+  askOwnName: 'Nombre del ejercicio propio:',
+  askMuscleGroup: 'Elige el grupo muscular:',
+  askTargets: 'Objetivos como "4 6-10 90" (series reps-min descanso) o pulsa Saltar:',
+
+  routineCreated(name: string): string {
+    return `Rutina "${name}" creada.`;
+  },
+  exerciseAdded(name: string): string {
+    return `Añadido: ${name}.`;
+  },
 };
 
 export function parseErrorText(reason: ParseErrorReason): string {

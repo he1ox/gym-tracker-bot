@@ -8,6 +8,7 @@
     "start": "node --disable-warning=ExperimentalWarning src/main.ts"
   },
   "dependencies": {
+    "@grammyjs/conversations": "^2.1.1",
     "@gym-tracker/core": "workspace:*",
     "@gym-tracker/db": "workspace:*",
     "grammy": "^1.45.1"
