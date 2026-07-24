@@ -5,6 +5,7 @@ import { auth } from './auth';
 import { renderActive, registerCapture } from './capture';
 import type { CustomContext } from './context';
 import { dedup } from './dedup';
+import { registerLast } from './last';
 import { createRestTimers } from './rest-timer';
 import { registerRoutines } from './routines-wizard';
 
@@ -26,6 +27,7 @@ export function createBot(
 
   // --- Fase 1: /routines antes de la captura; /last se añade en la Task 16 ---
   registerRoutines(bot, db, config);
+  registerLast(bot, db, config);
 
   const restTimers = createRestTimers({
     send: async (chatId, text) => (await bot.api.sendMessage(chatId, text)).message_id,

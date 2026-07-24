@@ -84,6 +84,19 @@ export const T = {
   exerciseAdded(name: string): string {
     return `Añadido: ${name}.`;
   },
+
+  // /last command (Task 16)
+  lastUsage: 'Uso: /last <ejercicio>. Ej.: /last press banca.',
+  lastAmbiguous: '¿Cuál de estos?',
+  lastNoHistory(name: string): string {
+    return `Todavía no tienes series de ${name}.`;
+  },
+  lastHeader(name: string): string {
+    return `📊 ${name} — últimas sesiones`;
+  },
+  lastBest(kg: string): string {
+    return `Mejor 1RM estimado: ${kg} kg`;
+  },
 };
 
 export function parseErrorText(reason: ParseErrorReason): string {
