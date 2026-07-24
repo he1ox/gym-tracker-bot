@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MIGRATIONS_DIR, openDatabase, runMigrations } from './index';
 
 const EXPECTED_TABLES = [
+  'bot_sessions',
   'exercises',
   'processed_updates',
   'routine_days',
@@ -68,5 +69,41 @@ describe('runMigrations', () => {
       archived: number;
     };
     expect(row).toEqual({ is_custom: 0, archived: 0 });
+  });
+
+  it('creates the bot_sessions table with the session-state columns', () => {
+    const db = migratedDb();
+    const cols = db
+      .prepare("SELECT name FROM pragma_table_info('bot_sessions') ORDER BY name")
+      .all() as Array<{ name: string }>;
+    expect(cols.map((c) => c.name)).toEqual([
+      'chat_id',
+      'current_exercise_id',
+      'ephemeral_message_id',
+      'message_id',
+      'next_set_is_warmup',
+      'pending_reps',
+      'pending_weight_kg',
+      'updated_at',
+      'user_id',
+      'workout_id',
+    ]);
+  });
+
+  it('makes user_id the primary key of bot_sessions', () => {
+    const db = migratedDb();
+    const pk = db
+      .prepare("SELECT name FROM pragma_table_info('bot_sessions') WHERE pk = 1")
+      .get() as { name: string } | undefined;
+    expect(pk?.name).toBe('user_id');
+  });
+
+  it('enforces the bot_sessions foreign keys', () => {
+    const db = migratedDb();
+    const insert = db.prepare(
+      'INSERT INTO bot_sessions (user_id, workout_id, chat_id, next_set_is_warmup, updated_at) VALUES (?, ?, ?, ?, ?)',
+    );
+    // user_id 1 / workout_id 1 no existen todavía → viola FK.
+    expect(() => insert.run(1, 1, 555, 0, Date.now())).toThrow(/FOREIGN KEY|constraint/i);
   });
 });

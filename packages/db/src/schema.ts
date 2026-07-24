@@ -89,3 +89,20 @@ export const processedUpdates = sqliteTable('processed_updates', {
   updateId: integer('update_id').primaryKey(),
   processedAt: integer('processed_at', { mode: 'timestamp_ms' }).notNull(),
 });
+
+export const botSessions = sqliteTable('bot_sessions', {
+  userId: integer('user_id')
+    .primaryKey()
+    .references(() => users.id),
+  workoutId: integer('workout_id')
+    .notNull()
+    .references(() => workouts.id),
+  chatId: integer('chat_id').notNull(),
+  messageId: integer('message_id'),
+  currentExerciseId: integer('current_exercise_id').references(() => exercises.id),
+  pendingWeightKg: real('pending_weight_kg'),
+  pendingReps: integer('pending_reps'),
+  nextSetIsWarmup: integer('next_set_is_warmup', { mode: 'boolean' }).notNull().default(false),
+  ephemeralMessageId: integer('ephemeral_message_id'),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+});
