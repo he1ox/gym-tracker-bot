@@ -31,8 +31,10 @@ export type CallbackAction =
 
 function parseIdSuffix(data: string, prefix: string): number | undefined {
   const raw = data.slice(prefix.length);
+  // Solo acepta dígitos decimales canónicos con valor > 0
+  if (!/^\d+$/.test(raw)) return undefined;
   const n = Number(raw);
-  return raw !== '' && Number.isInteger(n) ? n : undefined;
+  return n > 0 ? n : undefined;
 }
 
 export function parseCallback(data: string): CallbackAction {

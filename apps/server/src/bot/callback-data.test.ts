@@ -28,5 +28,18 @@ describe('callback-data', () => {
     expect(parseCallback('nope')).toEqual({ type: 'unknown' });
     expect(parseCallback('day:notanumber')).toEqual({ type: 'unknown' });
     expect(parseCallback('')).toEqual({ type: 'unknown' });
+    // Reject hex notation
+    expect(parseCallback('day:0x10')).toEqual({ type: 'unknown' });
+    // Reject whitespace
+    expect(parseCallback('day: ')).toEqual({ type: 'unknown' });
+    // Reject sign prefix
+    expect(parseCallback('day:+7')).toEqual({ type: 'unknown' });
+    // Reject decimal notation
+    expect(parseCallback('day:1.0')).toEqual({ type: 'unknown' });
+    // Reject negative values
+    expect(parseCallback('day:-3')).toEqual({ type: 'unknown' });
+    expect(parseCallback('ex:-3')).toEqual({ type: 'unknown' });
+    // Reject empty suffix
+    expect(parseCallback('day:')).toEqual({ type: 'unknown' });
   });
 });
