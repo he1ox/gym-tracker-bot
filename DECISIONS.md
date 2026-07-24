@@ -61,3 +61,9 @@ Registro del porqué. El qué vive en `SPEC.md`; el diseño de cada fase en `doc
   del wizard; no depende de nada test-only, así que también aplica en producción a
   transformers legítimos (rate limiting, logging) sin cambiar el comportamiento cuando no hay
   ninguno instalado.
+- **tsx** (devDependency de `apps/server`) como runner de desarrollo del proceso.
+  Node nativo (ESM) exige extensiones en los imports relativos, pero el código usa
+  imports sin extensión (moduleResolution "Bundler"); tsx resuelve eso y hace
+  type-stripping. Es dev-only (no llega al usuario final); ya estaba en el árbol vía
+  vitest→vite, así que declararlo no agranda el runtime. El runtime definitivo del
+  binario se decide en Fase 4.
