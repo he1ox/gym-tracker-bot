@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "start": "node --disable-warning=ExperimentalWarning src/main.ts"
+    "start": "tsx src/main.ts"
   },
   "dependencies": {
     "@grammyjs/conversations": "^2.1.1",

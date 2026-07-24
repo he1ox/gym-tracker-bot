@@ -1,0 +1,45 @@
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { MIGRATIONS_DIR, openDatabase, runMigrations } from '@gym-tracker/db';
+import { createBot } from './bot/bot';
+import { ConfigError, loadConfig } from './config';
+
+function main(): void {
+  const config = loadConfig();
+  mkdirSync(dirname(config.dbPath), { recursive: true });
+  const db = openDatabase(config.dbPath);
+  const applied = runMigrations(db, MIGRATIONS_DIR);
+  if (applied.length > 0) {
+    console.log(`[db] applied migrations: ${applied.join(', ')}`);
+  }
+
+  const bot = createBot(config.telegramBotToken, db, config);
+
+  const shutdown = (signal: string): void => {
+    console.log(`[shutdown] ${signal} received`);
+    void bot
+      .stop()
+      .catch((error) => console.error(`[shutdown] bot.stop failed: ${String(error)}`))
+      .finally(() => {
+        db.close();
+        process.exit(0);
+      });
+  };
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
+  process.once('SIGINT', () => shutdown('SIGINT'));
+
+  void bot.start({
+    onStart: (info) => console.log(`[bot] long polling as @${info.username}`),
+  });
+}
+
+try {
+  main();
+} catch (error) {
+  if (error instanceof ConfigError) {
+    console.error(`[config] ${error.message}`);
+  } else {
+    console.error(`[fatal] ${error instanceof Error ? error.message : String(error)}`);
+  }
+  process.exit(1);
+}
