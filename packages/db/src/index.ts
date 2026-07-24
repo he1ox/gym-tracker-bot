@@ -1,3 +1,10 @@
 export * from './schema';
 export { openDatabase } from './database';
 export { MIGRATIONS_DIR, runMigrations } from './migrations';
+export * from './repositories/users';
+export * from './repositories/exercises';
+export * from './repositories/routines';
+export * from './repositories/workouts';
+export * from './repositories/sets';
+export * from './repositories/processed-updates';
+export * from './repositories/bot-sessions';

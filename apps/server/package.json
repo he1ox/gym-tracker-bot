@@ -1,0 +1,20 @@
+{
+  "name": "@gym-tracker/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "start": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@grammyjs/conversations": "^2.1.1",
+    "@gym-tracker/core": "workspace:*",
+    "@gym-tracker/db": "workspace:*",
+    "grammy": "^1.45.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "tsx": "^4.23.1"
+  }
+}
