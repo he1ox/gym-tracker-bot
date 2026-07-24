@@ -25,6 +25,7 @@ export function makeHarness(
   db: DatabaseSync,
   botInfo: unknown,
   config: { allowedTelegramIds: number[]; timezone: string },
+  failOn?: string,
 ): { bot: Bot<CustomContext>; outgoing: OutgoingCall[] } {
   const bot = createBot('TEST:TOKEN', db, config, botInfo as never);
   const outgoing: OutgoingCall[] = [];
@@ -41,6 +42,11 @@ export function makeHarness(
   // simular respuestas mínimas (no hay ESLint en el repo).
   bot.api.config.use(((_prev: unknown, method: string, payload: Record<string, unknown>) => {
     outgoing.push({ method, payload });
+    if (failOn !== undefined && method === failOn) {
+      // Simula un fallo de la API de Telegram en esta llamada concreta, para
+      // probar que bot.catch contiene el error sin detener el polling.
+      throw new Error(`simulated failure for ${method}`);
+    }
     let result: unknown = true;
     if (method === 'sendMessage') {
       seq += 1;

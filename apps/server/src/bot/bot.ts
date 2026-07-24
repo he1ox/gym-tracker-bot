@@ -8,6 +8,7 @@ import { dedup } from './dedup';
 import { registerLast } from './last';
 import { createRestTimers } from './rest-timer';
 import { registerRoutines } from './routines-wizard';
+import { T } from './texts';
 
 export interface BotDeps {
   allowedTelegramIds: number[];
@@ -41,5 +42,23 @@ export function createBot(
   });
 
   registerCapture(bot, db, config, restTimers);
+
+  // Handler global de errores: grammY, por defecto, loguea, detiene el polling
+  // (bot.stop()) y relanza el error de cualquier handler no capturado. El
+  // contrato de errores del diseño exige seguir escuchando: logueamos y
+  // respondemos un mensaje genérico "best-effort", sin nunca relanzar.
+  bot.catch(async (err) => {
+    console.error(`Unhandled error while handling update ${err.ctx.update.update_id}:`, err.error);
+    try {
+      if (err.ctx.callbackQuery) {
+        await err.ctx.answerCallbackQuery(T.genericError);
+      } else {
+        await err.ctx.reply(T.genericError);
+      }
+    } catch {
+      // Best-effort: si incluso responder falla, no hay nada más que hacer.
+    }
+  });
+
   return bot;
 }

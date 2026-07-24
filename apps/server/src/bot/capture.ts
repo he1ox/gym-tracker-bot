@@ -231,9 +231,16 @@ async function handleCallback(ctx: CustomContext, db: DatabaseSync, restTimers: 
   }
 
   switch (action.type) {
-    case 'ex':
+    case 'ex': {
+      // foreign_keys = ON: un id inexistente en switchExercise lanzaría un error FK.
+      // Guardia simétrica a la de 'day' más arriba.
+      if (!getExerciseById(db, action.exerciseId)) {
+        await ctx.answerCallbackQuery(T.genericError);
+        return;
+      }
       switchExercise(db, { session, exerciseId: action.exerciseId, now });
       break;
+    }
     case 'list':
       updateSession(db, userId, { currentExerciseId: null }, now);
       break;
@@ -257,15 +264,15 @@ async function handleCallback(ctx: CustomContext, db: DatabaseSync, restTimers: 
       toggleWarmup(db, { session, now });
       break;
     case 'rec': {
-      if (session.currentExerciseId === null || session.pendingWeightKg === null || session.pendingReps === null) {
+      // recordSet lanza ValidationError si weightKg<=0 o reps<1, y el renderer solo
+      // muestra el botón ↻ con weight>0 && reps>=1: un ↻ obsoleto pulsado tras ajustar
+      // el pending a 0 no debe llegar a doRecord.
+      const { currentExerciseId, pendingWeightKg: w, pendingReps: r } = session;
+      if (currentExerciseId === null || w === null || r === null || w <= 0 || r < 1) {
         await ctx.answerCallbackQuery(T.needWeightAndReps);
         return;
       }
-      await doRecord(ctx.api, db, restTimers, session, {
-        weightKg: session.pendingWeightKg,
-        reps: session.pendingReps,
-        rpe: null,
-      });
+      await doRecord(ctx.api, db, restTimers, session, { weightKg: w, reps: r, rpe: null });
       await ctx.answerCallbackQuery();
       return;
     }

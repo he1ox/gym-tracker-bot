@@ -13,6 +13,7 @@ import {
 } from '@gym-tracker/db';
 import {
   ValidationError,
+  adjustPending,
   buildSessionView,
   finishWorkout,
   recordSet,
@@ -84,6 +85,42 @@ describe('session-service', () => {
       expect(view.today).toEqual([{ weightKg: 60, reps: 8 }]);
       expect(view.header.effectiveSets).toBe(1);
     }
+  });
+
+  it('adjustPending applies weight/rep steps, clamps at zero, and avoids float drift', () => {
+    const d = db();
+    const s = startWorkout(d, { userId: 1, chatId: 555, routineDayId: null, dayNameSnapshot: null, now: 1000 });
+    switchExercise(d, { session: s, exerciseId: EX, now: 1000 });
+
+    // Peso: paso +2.5 desde null (tratado como 0)
+    adjustPending(d, { session: getSession(d, 1)!, weightDelta: 2.5, now: 1100 });
+    expect(getSession(d, 1)!.pendingWeightKg).toBe(2.5);
+
+    // Reps: paso +1
+    adjustPending(d, { session: getSession(d, 1)!, repsDelta: 1, now: 1200 });
+    expect(getSession(d, 1)!.pendingReps).toBe(1);
+
+    // Reps: paso -1 vuelve a 0
+    adjustPending(d, { session: getSession(d, 1)!, repsDelta: -1, now: 1300 });
+    expect(getSession(d, 1)!.pendingReps).toBe(0);
+
+    // Reps: no baja de 0 (clamp)
+    adjustPending(d, { session: getSession(d, 1)!, repsDelta: -1, now: 1400 });
+    expect(getSession(d, 1)!.pendingReps).toBe(0);
+
+    // Peso: paso -2.5 vuelve a 0
+    adjustPending(d, { session: getSession(d, 1)!, weightDelta: -2.5, now: 1500 });
+    expect(getSession(d, 1)!.pendingWeightKg).toBe(0);
+
+    // Peso: no baja de 0 (clamp)
+    adjustPending(d, { session: getSession(d, 1)!, weightDelta: -2.5, now: 1600 });
+    expect(getSession(d, 1)!.pendingWeightKg).toBe(0);
+
+    // Peso: redondea a un decimal sin arrastre de coma flotante (0.1 + 0.2 = 0.30000000000000004 sin redondeo)
+    adjustPending(d, { session: getSession(d, 1)!, weightDelta: 0.1, now: 1700 });
+    expect(getSession(d, 1)!.pendingWeightKg).toBe(0.1);
+    adjustPending(d, { session: getSession(d, 1)!, weightDelta: 0.2, now: 1800 });
+    expect(getSession(d, 1)!.pendingWeightKg).toBe(0.3);
   });
 
   it('finishWorkout closes the workout, deletes the session and reports a record', () => {
