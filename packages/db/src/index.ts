@@ -6,3 +6,5 @@ export * from './repositories/exercises';
 export * from './repositories/routines';
 export * from './repositories/workouts';
 export * from './repositories/sets';
+export * from './repositories/processed-updates';
+export * from './repositories/bot-sessions';
