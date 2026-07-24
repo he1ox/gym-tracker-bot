@@ -38,3 +38,6 @@ Registro del porqué. El qué vive en `SPEC.md`; el diseño de cada fase en `doc
   `@grammyjs/conversations` se reserva para el wizard lineal de `/routines`.
 - **`callback-data.ts` separado de `capture.ts`**: builders sin ciclos, importables por
   `session-view` y `capture`. Sigue siendo un único parser (`parseCallback`).
+- **Usuario creado en el primer contacto permitido**, no en `/start`**: el middleware `auth` crea
+  la fila en la BD la primera vez que un id autorizado toca cualquier update (callback, comando,
+  etc.). Idempotente y garantiza que `ctx.user` nunca es undefined en handlers posteriores.
