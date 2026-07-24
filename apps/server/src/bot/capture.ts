@@ -1,0 +1,367 @@
+import { parseSetInput } from '@gym-tracker/core';
+import {
+  type BotSessionRow,
+  getActiveRoutine,
+  getExerciseById,
+  getRoutineDayById,
+  getSession,
+  getWorkoutById,
+  listCatalogAndOwn,
+  listRoutineDays,
+  listRoutineExerciseDetails,
+  updateSession,
+} from '@gym-tracker/db';
+import { type Api, type Bot, GrammyError, InlineKeyboard } from 'grammy';
+import type { DatabaseSync } from 'node:sqlite';
+import { matchExercise } from '../services/exercise-match';
+import {
+  adjustPending,
+  buildSessionView as buildView,
+  finishWorkout,
+  recordSet,
+  restTargetForCurrentExercise,
+  startWorkout,
+  switchExercise,
+  toggleWarmup,
+} from '../services/session-service';
+import { parseCallback } from './callback-data';
+import type { CustomContext } from './context';
+import type { RestTimers } from './rest-timer';
+import { renderDayPicker, renderFinishSummary, renderSession } from './session-view';
+import { T, parseErrorText } from './texts';
+
+function isNotModified(error: unknown): boolean {
+  return error instanceof GrammyError && error.description.includes('message is not modified');
+}
+
+async function editOrSend(
+  api: Api,
+  db: DatabaseSync,
+  session: BotSessionRow,
+  text: string,
+  keyboard: InlineKeyboard,
+): Promise<void> {
+  if (session.messageId !== null) {
+    try {
+      await api.editMessageText(session.chatId, session.messageId, text, { reply_markup: keyboard });
+      return;
+    } catch (error) {
+      if (isNotModified(error)) {
+        return;
+      }
+      // El mensaje activo ya no es editable (borrado/antiguo): enviamos uno nuevo.
+    }
+  }
+  const sent = await api.sendMessage(session.chatId, text, { reply_markup: keyboard });
+  updateSession(db, session.userId, { messageId: sent.message_id }, Date.now());
+}
+
+export async function renderActive(
+  api: Api,
+  db: DatabaseSync,
+  session: BotSessionRow,
+  restTimers: RestTimers,
+): Promise<void> {
+  const model = buildView(db, session);
+  if (model.kind === 'in_exercise') {
+    const seconds = restTimers.activeSeconds(session.userId);
+    if (seconds !== undefined) {
+      model.restTimer = { seconds };
+    }
+  }
+  const { text, keyboard } = renderSession(model);
+  await editOrSend(api, db, session, text, keyboard);
+}
+
+async function sendEphemeral(api: Api, db: DatabaseSync, session: BotSessionRow, text: string): Promise<void> {
+  if (session.ephemeralMessageId !== null) {
+    await api.deleteMessage(session.chatId, session.ephemeralMessageId).catch(() => {});
+  }
+  const sent = await api.sendMessage(session.chatId, text);
+  updateSession(db, session.userId, { ephemeralMessageId: sent.message_id }, Date.now());
+}
+
+async function deletePreviousEphemeral(api: Api, session: BotSessionRow, messageId: number | null): Promise<void> {
+  if (messageId !== null) {
+    await api.deleteMessage(session.chatId, messageId).catch(() => {});
+  }
+}
+
+function poolForMatching(db: DatabaseSync, session: BotSessionRow): Array<{ id: number; name: string }> {
+  if (session.currentExerciseId === null) {
+    return listCatalogAndOwn(db, session.userId).map((e) => ({ id: e.id, name: e.name }));
+  }
+  const workout = getWorkoutById(db, session.workoutId);
+  if (workout && workout.routineDayId !== null) {
+    const day = listRoutineExerciseDetails(db, workout.routineDayId).map((d) => ({ id: d.exerciseId, name: d.name }));
+    if (day.length > 0) {
+      return day;
+    }
+  }
+  return listCatalogAndOwn(db, session.userId).map((e) => ({ id: e.id, name: e.name }));
+}
+
+type Resolved = { id: number; name: string } | 'ambiguous' | 'none';
+
+function resolveExerciseByName(db: DatabaseSync, session: BotSessionRow, query: string): Resolved {
+  const result = matchExercise(query, poolForMatching(db, session));
+  if (result.kind === 'unique') {
+    return { id: result.exercise.id, name: result.exercise.name };
+  }
+  return result.kind === 'ambiguous' ? 'ambiguous' : 'none';
+}
+
+async function doRecord(
+  api: Api,
+  db: DatabaseSync,
+  restTimers: RestTimers,
+  session: BotSessionRow,
+  input: { weightKg: number; reps: number; rpe: number | null },
+): Promise<void> {
+  const wasWarmup = session.nextSetIsWarmup;
+  const { previousEphemeralMessageId } = recordSet(db, {
+    session,
+    weightKg: input.weightKg,
+    reps: input.reps,
+    rpe: input.rpe,
+    isWarmup: wasWarmup,
+    now: Date.now(),
+  });
+  await deletePreviousEphemeral(api, session, previousEphemeralMessageId);
+  if (!wasWarmup && session.currentExerciseId !== null) {
+    const target = restTargetForCurrentExercise(db, session);
+    if (target) {
+      const exercise = getExerciseById(db, session.currentExerciseId);
+      restTimers.schedule({
+        userId: session.userId,
+        chatId: session.chatId,
+        seconds: target,
+        exerciseName: exercise?.name ?? '',
+      });
+    }
+  }
+  const fresh = getSession(db, session.userId);
+  if (fresh) {
+    await renderActive(api, db, fresh, restTimers);
+  }
+}
+
+async function handleStart(ctx: CustomContext, db: DatabaseSync, restTimers: RestTimers): Promise<void> {
+  const userId = ctx.user.id;
+  const existing = getSession(db, userId);
+  if (existing) {
+    await renderActive(ctx.api, db, existing, restTimers); // reanudación
+    return;
+  }
+  const active = getActiveRoutine(db, userId);
+  const days = active
+    ? listRoutineDays(db, active.id).map((d) => ({ routineDayId: d.id, name: d.name }))
+    : [];
+  const { text, keyboard } = renderDayPicker(days);
+  await ctx.reply(text, { reply_markup: keyboard });
+}
+
+async function handleFinish(ctx: CustomContext, db: DatabaseSync, restTimers: RestTimers): Promise<void> {
+  const userId = ctx.user.id;
+  const session = getSession(db, userId);
+  if (!session) {
+    await ctx.reply(T.noActiveSessionToast);
+    return;
+  }
+  restTimers.cancel(userId);
+  if (session.ephemeralMessageId !== null) {
+    await ctx.api.deleteMessage(session.chatId, session.ephemeralMessageId).catch(() => {});
+  }
+  const summary = finishWorkout(db, { session, now: Date.now() });
+  const text = renderFinishSummary(summary);
+  if (session.messageId !== null) {
+    try {
+      await ctx.api.editMessageText(session.chatId, session.messageId, text, { reply_markup: new InlineKeyboard() });
+      return;
+    } catch (error) {
+      if (isNotModified(error)) {
+        return;
+      }
+    }
+  }
+  await ctx.api.sendMessage(session.chatId, text);
+}
+
+async function handleCallback(ctx: CustomContext, db: DatabaseSync, restTimers: RestTimers): Promise<void> {
+  const data = ctx.callbackQuery?.data;
+  if (data === undefined) {
+    return;
+  }
+  const action = parseCallback(data);
+  const userId = ctx.user.id;
+  const now = Date.now();
+
+  // Inicio de sesión: todavía no existe la fila bot_sessions.
+  if (action.type === 'day' || action.type === 'free') {
+    if (getSession(db, userId)) {
+      await ctx.answerCallbackQuery();
+      return;
+    }
+    let routineDayId: number | null = null;
+    let dayNameSnapshot: string | null = null;
+    if (action.type === 'day') {
+      const day = getRoutineDayById(db, action.routineDayId);
+      if (!day) {
+        await ctx.answerCallbackQuery(T.genericError);
+        return;
+      }
+      routineDayId = day.id;
+      dayNameSnapshot = day.name;
+    }
+    const chatId = ctx.chat?.id ?? userId;
+    startWorkout(db, { userId, chatId, routineDayId, dayNameSnapshot, now });
+    updateSession(db, userId, { messageId: ctx.callbackQuery?.message?.message_id ?? null }, now);
+    const session = getSession(db, userId);
+    if (session) {
+      await renderActive(ctx.api, db, session, restTimers);
+    }
+    await ctx.answerCallbackQuery();
+    return;
+  }
+
+  const session = getSession(db, userId);
+  if (!session) {
+    await ctx.answerCallbackQuery(T.sessionEndedToast);
+    return;
+  }
+
+  switch (action.type) {
+    case 'ex':
+      switchExercise(db, { session, exerciseId: action.exerciseId, now });
+      break;
+    case 'list':
+      updateSession(db, userId, { currentExerciseId: null }, now);
+      break;
+    case 'add': {
+      updateSession(db, userId, { currentExerciseId: null }, now);
+      const fresh = getSession(db, userId);
+      if (fresh) {
+        await sendEphemeral(ctx.api, db, fresh, T.typeExerciseName);
+        await renderActive(ctx.api, db, getSession(db, userId) ?? fresh, restTimers);
+      }
+      await ctx.answerCallbackQuery();
+      return;
+    }
+    case 'weight':
+      adjustPending(db, { session, weightDelta: action.delta, now });
+      break;
+    case 'reps':
+      adjustPending(db, { session, repsDelta: action.delta, now });
+      break;
+    case 'warmup':
+      toggleWarmup(db, { session, now });
+      break;
+    case 'rec': {
+      if (session.currentExerciseId === null || session.pendingWeightKg === null || session.pendingReps === null) {
+        await ctx.answerCallbackQuery(T.needWeightAndReps);
+        return;
+      }
+      await doRecord(ctx.api, db, restTimers, session, {
+        weightKg: session.pendingWeightKg,
+        reps: session.pendingReps,
+        rpe: null,
+      });
+      await ctx.answerCallbackQuery();
+      return;
+    }
+    case 'rest_cancel':
+      restTimers.cancel(userId);
+      break;
+    default:
+      await ctx.answerCallbackQuery();
+      return;
+  }
+
+  const fresh = getSession(db, userId);
+  if (fresh) {
+    await renderActive(ctx.api, db, fresh, restTimers);
+  }
+  await ctx.answerCallbackQuery();
+}
+
+async function handleText(
+  ctx: CustomContext,
+  db: DatabaseSync,
+  restTimers: RestTimers,
+  next: () => Promise<void>,
+): Promise<void> {
+  const text = ctx.message?.text ?? '';
+  if (text.startsWith('/')) {
+    await next(); // deja pasar comandos (/routines, /last…)
+    return;
+  }
+  const userId = ctx.user.id;
+  const session = getSession(db, userId);
+  if (!session) {
+    await ctx.reply(T.noActiveSessionToast);
+    return;
+  }
+
+  const parsed = parseSetInput(text);
+  if (parsed.ok) {
+    let current = session;
+    if (parsed.value.exerciseName) {
+      const matched = resolveExerciseByName(db, session, parsed.value.exerciseName);
+      if (matched === 'ambiguous') {
+        await sendEphemeral(ctx.api, db, session, T.ambiguousMatch);
+        return;
+      }
+      if (matched === 'none') {
+        await sendEphemeral(ctx.api, db, session, T.noMatch(parsed.value.exerciseName));
+        return;
+      }
+      switchExercise(db, { session, exerciseId: matched.id, now: Date.now() });
+      current = getSession(db, userId) ?? session;
+    }
+    if (current.currentExerciseId === null) {
+      await sendEphemeral(ctx.api, db, current, T.chooseExercisePrompt);
+      return;
+    }
+    await ctx.deleteMessage().catch(() => {}); // chat limpio
+    await doRecord(ctx.api, db, restTimers, current, {
+      weightKg: parsed.value.weightKg,
+      reps: parsed.value.reps,
+      rpe: parsed.value.rpe ?? null,
+    });
+    return;
+  }
+
+  // Texto sin serie válida: en estado "eligiendo ejercicio" se interpreta como búsqueda por nombre.
+  if (session.currentExerciseId === null) {
+    const matched = resolveExerciseByName(db, session, text);
+    if (matched === 'ambiguous') {
+      await sendEphemeral(ctx.api, db, session, T.ambiguousMatch);
+      return;
+    }
+    if (matched === 'none') {
+      await sendEphemeral(ctx.api, db, session, T.noMatch(text));
+      return;
+    }
+    switchExercise(db, { session, exerciseId: matched.id, now: Date.now() });
+    await ctx.deleteMessage().catch(() => {});
+    const fresh = getSession(db, userId);
+    if (fresh) {
+      await renderActive(ctx.api, db, fresh, restTimers);
+    }
+    return;
+  }
+
+  await sendEphemeral(ctx.api, db, session, parseErrorText(parsed.reason));
+}
+
+export function registerCapture(
+  bot: Bot<CustomContext>,
+  db: DatabaseSync,
+  _config: { timezone: string },
+  restTimers: RestTimers,
+): void {
+  bot.command('start', (ctx) => handleStart(ctx, db, restTimers));
+  bot.command('finish', (ctx) => handleFinish(ctx, db, restTimers));
+  bot.on('callback_query:data', (ctx) => handleCallback(ctx, db, restTimers));
+  bot.on('message:text', (ctx, next) => handleText(ctx, db, restTimers, next));
+}

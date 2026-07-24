@@ -11,6 +11,7 @@ export const T = {
   // Selección de ejercicio (estado 2)
   chooseExercisePrompt: 'Elige un ejercicio:',
   otherExerciseButton: '➕ Otro ejercicio',
+  typeExerciseName: 'Escribe el nombre del ejercicio a añadir.',
 
   // En ejercicio (estado 3)
   headerIcon: '🏋️',
