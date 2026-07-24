@@ -9,7 +9,8 @@
   },
   "dependencies": {
     "@gym-tracker/core": "workspace:*",
-    "@gym-tracker/db": "workspace:*"
+    "@gym-tracker/db": "workspace:*",
+    "grammy": "^1.45.1"
   },
   "devDependencies": {
     "@types/node": "^26.1.1"

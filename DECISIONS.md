@@ -28,3 +28,13 @@ Registro del porqué. El qué vive en `SPEC.md`; el diseño de cada fase en `doc
   `--disable-warning=ExperimentalWarning` en los workers de Vitest): en Node 24 el módulo ya
   no exige flag pero sigue emitiendo el warning; silenciarlo de forma dirigida mantiene la
   salida de tests limpia sin ocultar otros warnings.
+
+## 2026-07-24 — Fase 1
+
+- **`grammy`** como framework del bot (mandado por SPEC §3). Único cliente de la API de
+  Telegram; long polling; `InlineKeyboard` y transformers para el testing de fixtures.
+- **Estado de sesión en SQLite (`bot_sessions`), no en memoria de grammY**: el flujo de
+  captura es un teclado persistente editado in-place que debe sobrevivir reinicios.
+  `@grammyjs/conversations` se reserva para el wizard lineal de `/routines`.
+- **`callback-data.ts` separado de `capture.ts`**: builders sin ciclos, importables por
+  `session-view` y `capture`. Sigue siendo un único parser (`parseCallback`).
