@@ -1,0 +1,41 @@
+export const MUSCLE_GROUPS = [
+  'chest',
+  'front_delt',
+  'side_delt',
+  'rear_delt',
+  'lats',
+  'upper_back',
+  'lower_back',
+  'traps',
+  'biceps',
+  'triceps',
+  'forearms',
+  'abs',
+  'quads',
+  'hamstrings',
+  'glutes',
+  'adductors',
+  'calves',
+] as const;
+
+export type MuscleGroup = (typeof MUSCLE_GROUPS)[number];
+
+export const MUSCLE_GROUP_LABELS: Record<MuscleGroup, string> = {
+  chest: 'Pecho',
+  front_delt: 'Deltoide anterior',
+  side_delt: 'Deltoide lateral',
+  rear_delt: 'Deltoide posterior',
+  lats: 'Dorsal',
+  upper_back: 'Espalda alta',
+  lower_back: 'Lumbar',
+  traps: 'Trapecio',
+  biceps: 'Bíceps',
+  triceps: 'Tríceps',
+  forearms: 'Antebrazo',
+  abs: 'Abdominales',
+  quads: 'Cuádriceps',
+  hamstrings: 'Femorales',
+  glutes: 'Glúteos',
+  adductors: 'Aductores',
+  calves: 'Gemelos',
+};
