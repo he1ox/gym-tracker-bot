@@ -53,6 +53,13 @@ export const T = {
   noMatch(query: string): string {
     return `No encontré "${query}". Créalo con /routines.`;
   },
+  estimatedRecordLabel: '1RM est.',
+  setsSummary(count: number): string {
+    return `${count} ${count === 1 ? 'serie' : 'series'}`;
+  },
+  previousRecord(kg: string): string {
+    return ` (antes ${kg} kg)`;
+  },
 };
 
 export function parseErrorText(reason: ParseErrorReason): string {
