@@ -34,3 +34,55 @@ describe('matchExercise', () => {
     expect(matchExercise('   ', gym)).toEqual({ kind: 'none' });
   });
 });
+
+const accented = [
+  { id: 10, name: 'Jalón al pecho en polea' },
+  { id: 11, name: 'Extensión de tríceps en polea' },
+  { id: 12, name: 'Elevaciones laterales en polea' },
+];
+
+describe('matchExercise — accents and multi-term queries', () => {
+  it('matches a query typed without accents', () => {
+    expect(matchExercise('jalon', accented)).toEqual({ kind: 'unique', exercise: accented[0] });
+  });
+
+  it('matches an accented query against an accented name', () => {
+    expect(matchExercise('jalón', accented)).toEqual({ kind: 'unique', exercise: accented[0] });
+  });
+
+  it('matches all terms in any order', () => {
+    expect(matchExercise('polea triceps', accented)).toEqual({ kind: 'unique', exercise: accented[1] });
+    expect(matchExercise('triceps polea', accented)).toEqual({ kind: 'unique', exercise: accented[1] });
+  });
+
+  it('returns every exercise whose name contains all the terms', () => {
+    const r = matchExercise('polea', accented);
+    expect(r.kind).toBe('ambiguous');
+    if (r.kind === 'ambiguous') {
+      expect(r.candidates.map((c) => c.id)).toEqual([10, 11, 12]);
+    }
+  });
+
+  it('requires every term, not just one', () => {
+    expect(matchExercise('polea sentadilla', accented)).toEqual({ kind: 'none' });
+  });
+
+  it('still prefers an exact name over a broader term match', () => {
+    const pool = [
+      { id: 1, name: 'Remo' },
+      { id: 2, name: 'Remo con barra' },
+    ];
+    expect(matchExercise('remo', pool)).toEqual({ kind: 'unique', exercise: pool[0] });
+  });
+
+  it('ignores accents and case when comparing the exact name', () => {
+    expect(matchExercise('JALON AL PECHO EN POLEA', accented)).toEqual({
+      kind: 'unique',
+      exercise: accented[0],
+    });
+  });
+
+  it('collapses runs of whitespace between terms', () => {
+    expect(matchExercise('  polea   triceps  ', accented)).toEqual({ kind: 'unique', exercise: accented[1] });
+  });
+});
