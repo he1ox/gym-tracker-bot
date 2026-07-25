@@ -43,7 +43,7 @@ const DAY_TEMPLATES: Record<string, readonly Template[]> = {
   ],
 };
 
-const SCHEDULE: ReadonlyArray<{ daysAgo: number; dayName: string; notes?: string }> = [
+const RECENT_SCHEDULE: ReadonlyArray<{ daysAgo: number; dayName: string; notes?: string }> = [
   { daysAgo: 1, dayName: 'Tirón', notes: 'El agarre falló en la última serie de peso muerto. La próxima, con correas.' },
   { daysAgo: 2, dayName: 'Pierna' },
   { daysAgo: 3, dayName: 'Empuje' },
@@ -68,6 +68,32 @@ const SCHEDULE: ReadonlyArray<{ daysAgo: number; dayName: string; notes?: string
   { daysAgo: 30, dayName: 'Empuje' },
 ];
 
+/**
+ * Older sessions, generated: the same three-day cycle stretching back about
+ * thirteen weeks. SPEC §8.1 asks for a tonnage trend over the last 8-12 weeks
+ * and a three-month consistency heatmap, which the recent block alone cannot
+ * fill — it only spans five ISO weeks.
+ */
+function olderSchedule(): Array<{ daysAgo: number; dayName: string }> {
+  const cycle = ['Empuje', 'Tirón', 'Pierna'] as const;
+  const out: Array<{ daysAgo: number; dayName: string }> = [];
+  let index = 0;
+  let daysAgo = 33;
+  while (daysAgo <= 90) {
+    const dayName = cycle[index % cycle.length];
+    if (dayName !== undefined) out.push({ daysAgo, dayName });
+    index++;
+    // A rest day after each completed cycle.
+    daysAgo += index % cycle.length === 0 ? 3 : 2;
+  }
+  return out;
+}
+
+const SCHEDULE: ReadonlyArray<{ daysAgo: number; dayName: string; notes?: string }> = [
+  ...RECENT_SCHEDULE,
+  ...olderSchedule(),
+];
+
 const COMPOUND = /banca|militar|peso muerto|remo con barra|sentadilla|dominadas/i;
 
 /**
@@ -87,6 +113,15 @@ function increment(template: Template): number {
 function progressionSteps(template: Template, stepsBack: number): number {
   if (!PLATEAUED.has(template.name)) return stepsBack;
   return Math.max(0, stepsBack - PLATEAU_SESSIONS);
+}
+
+/**
+ * The oldest sessions must not walk a light lift down to zero: core's
+ * estimate1RM rejects a non-positive weight. Floor every loaded lift at 40% of
+ * its current working weight, rounded to the nearest half kilo.
+ */
+function floorWeight(baseKg: number): number {
+  return Math.max(1, Math.round(baseKg * 0.4 * 2) / 2);
 }
 
 function buildExercises(): MockExercise[] {
@@ -191,7 +226,10 @@ export function buildDataset(now: Date = new Date()): Dataset {
     for (const template of templates) {
       const weight = template.isBodyweight === true
         ? template.weightKg
-        : Math.max(0, template.weightKg - increment(template) * progressionSteps(template, stepsBack));
+        : Math.max(
+            floorWeight(template.weightKg),
+            template.weightKg - increment(template) * progressionSteps(template, stepsBack),
+          );
 
       for (const [warmWeight, warmReps] of template.warmups ?? []) {
         cursor += 60_000;
