@@ -67,3 +67,32 @@ Registro del porqué. El qué vive en `SPEC.md`; el diseño de cada fase en `doc
   type-stripping. Es dev-only (no llega al usuario final); ya estaba en el árbol vía
   vitest→vite, así que declararlo no agranda el runtime. El runtime definitivo del
   binario se decide en Fase 4.
+
+## 2026-07-25 — Fase 3, parte 1 (dashboard web)
+
+- **Sistema de diseño Nocturne (CSS plano con custom properties) en vez de Tailwind +
+  shadcn/ui**, que era lo que SPEC §3 listaba. El dashboard se importó de un proyecto de
+  Claude Design cuya hoja de estilos es CSS puro; copiarla verbatim da fidelidad exacta al
+  diseño aprobado y quita dos dependencias grandes del árbol, que es lo que persigue
+  SPEC §12. Contrapartida: no hay utilidades de clase, así que los componentes llevan
+  `style` en línea sobre los tokens (`var(--color-…)`, `var(--space-…)`).
+- **Gráficas en SVG escrito a mano en vez de Recharts.** Las cuatro del diseño (sparkline,
+  área con degradado, heatmap y barras con banda de referencia) son ~15 líneas de SVG cada
+  una, se ven como el mockup y no arrastran dependencia. Contrapartida: sin tooltips ni
+  ejes automáticos; si el dashboard pide gráficas interactivas, se reevalúa.
+- **Router propio sobre `hashchange` (≈40 líneas) en vez de `react-router`.** Son cuatro
+  rutas planas, una con un parámetro numérico. Contrapartida: sin rutas anidadas ni carga
+  diferida por ruta; ambas cosas se añadirían a mano si hicieran falta.
+- **Se conserva el `@import` de Inter desde `fonts.googleapis.com`** tal como viene en
+  `nocturne.css`. Decisión explícita del autor. Contrapartida asumida: una petición externa
+  en cada carga en frío y, sin red, la tipografía cae al fallback `system-ui` del token.
+- **Los ejercicios de peso corporal quedan fuera de toda cifra derivada del 1RM** (1RM
+  estimado, récords, estancamiento). El esquema no guarda el peso del atleta, así que un 1RM
+  de dominadas sería un número inventado; el detalle muestra «—» y una nota. Sí cuentan para
+  volumen, tonelaje e histórico de series. Se revisa cuando el peso corporal sea un campo
+  almacenado.
+- **No se implementa la sugerencia de entrenamiento del mockup** («Deload to 90 kg…»): es
+  contenido inventado del previsualizador y SPEC §12 prohíbe inventar funcionalidad. Las
+  tarjetas de estancamiento muestran el dato medido: semanas sin superar el máximo previo.
+- **`@testing-library/jest-dom` descartada.** Los asserts se escriben con las utilidades de
+  Vitest sobre el DOM real; una dependencia menos por azúcar sintáctico.

@@ -1,6 +1,12 @@
 const GRADIENT_ID = 'area-gradient';
 
-export function AreaChart({ points, height = 150 }: { points: readonly number[]; height?: number }) {
+/**
+ * `markers` flags points to circle — the exercise detail screen uses it for
+ * records (SPEC 8.2). Positional, one boolean per point.
+ */
+export function AreaChart({ points, height = 150, markers }: {
+  points: readonly number[]; height?: number; markers?: readonly boolean[];
+}) {
   if (points.length < 2) return null;
   const min = Math.min(...points);
   const max = Math.max(...points);
@@ -24,6 +30,11 @@ export function AreaChart({ points, height = 150 }: { points: readonly number[];
       <line x1="8" y1={height - 10} x2="472" y2={height - 10} stroke="var(--color-divider)" strokeWidth="1" />
       <path d={area} fill={`url(#${GRADIENT_ID})`} />
       <polyline fill="none" stroke="#9184d9" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" points={line} />
+      {coords.map((point, index) => (
+        markers?.[index] === true
+          ? <circle key={index} cx={point.x} cy={point.y} r="2.75" fill="#9184d9" />
+          : null
+      ))}
       {last !== undefined && (
         <circle cx={last.x} cy={last.y} r="3.5" fill="var(--color-bg)" stroke="#9184d9" strokeWidth="1.75" />
       )}
