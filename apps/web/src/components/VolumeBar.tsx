@@ -1,8 +1,9 @@
 import { VOLUME_TARGET_MAX, VOLUME_TARGET_MIN } from '../config';
 import { ACCENT_DOWN } from '../presenters/format';
+import { isVolumeInBand } from '../presenters/volume';
 
 export function VolumeBar({ label, count, max }: { label: string; count: number; max: number }) {
-  const inBand = count >= VOLUME_TARGET_MIN && count <= VOLUME_TARGET_MAX;
+  const inBand = isVolumeInBand(count);
   const pct = (value: number) => `${Math.min(100, (value / max) * 100)}%`;
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr 30px', alignItems: 'center', gap: 12 }}>

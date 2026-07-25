@@ -1,12 +1,6 @@
 /** The design's up/down pair: accent for progress, amber for regression. */
 export const ACCENT_UP = 'var(--color-accent-300)';
-// Same color as #d4a15a, expressed in the canonical rgb() form. React sets
-// inline colors via the CSSOM (element.style.color), and both jsdom and
-// real browsers always serialize style.color back out as rgb(...) — so a
-// hex literal here could never round-trip through `getAttribute('style')`
-// for VolumeBar's out-of-band assertion. Same color, format that survives
-// serialization.
-export const ACCENT_DOWN = 'rgb(212, 161, 90)';
+export const ACCENT_DOWN = '#d4a15a';
 
 // `useGrouping: 'always'` is required: with the default 'auto' grouping,
 // this ICU build applies CLDR's "min2" rule for es-ES and skips the
