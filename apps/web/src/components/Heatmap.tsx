@@ -1,5 +1,11 @@
+/**
+ * 0-4 are training intensities; 'empty' is a cell outside the recorded range
+ * (a future date in the current week), which must not read as a rest day.
+ */
+export type HeatmapLevel = 0 | 1 | 2 | 3 | 4 | 'empty';
+
 export interface HeatmapDay {
-  level: 0 | 1 | 2 | 3 | 4;
+  level: HeatmapLevel;
   title: string;
 }
 
@@ -29,7 +35,8 @@ export function Heatmap({ weeks }: { weeks: ReadonlyArray<ReadonlyArray<HeatmapD
           <div key={weekIndex} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             {week.map((day, dayIndex) => (
               <div key={dayIndex} title={day.title} style={{
-                width: 13, height: 13, borderRadius: 2, background: LEVEL_BG[day.level],
+                width: 13, height: 13, borderRadius: 2,
+                background: day.level === 'empty' ? 'transparent' : LEVEL_BG[day.level],
               }} />
             ))}
           </div>

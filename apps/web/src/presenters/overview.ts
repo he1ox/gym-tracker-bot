@@ -106,13 +106,16 @@ export function buildOverview(data: Dataset, now: Date): OverviewModel {
       muscleLabel: MUSCLE_GROUP_LABELS[exercise.muscleGroup],
       weeks: result.weeksWithoutImprovement,
       history: [...byWeek.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([, v]) => v),
-      workingSet: formatLoad(latest.weightKg, latest.reps, exercise.isBodyweight),
+      // Bodyweight lifts were skipped above, so the load is always plate-loaded.
+      workingSet: formatLoad(latest.weightKg, latest.reps, false),
     });
   }
   stalled.sort((a, b) => b.weeks - a.weeks);
 
   // Recent records: the newest session that beat the prior best, per exercise.
-  const records: OverviewModel['records'] = [];
+  // Sorted on the day count, not on `when`: "hace 10 días" sorts before
+  // "hace 2 días" lexicographically.
+  const dated: Array<{ days: number; record: Omit<OverviewModel['records'][number], 'when'> }> = [];
   for (const exercise of data.exercises) {
     if (exercise.isBodyweight) continue;
     const sets = data.sets.filter((s) => s.exerciseId === exercise.id);
@@ -123,14 +126,21 @@ export function buildOverview(data: Dataset, now: Date): OverviewModel {
     if (bestSet === undefined) continue;
     const days = Math.round((now.getTime() - bestSet.createdAt.getTime()) / DAY_MS);
     if (days > 10) continue;
-    records.push({
-      name: exercise.name,
-      estimated1RM: `${formatKg(Math.round(best))} kg`,
-      detail: formatLoad(bestSet.weightKg, bestSet.reps, exercise.isBodyweight),
-      when: days === 0 ? 'hoy' : days === 1 ? 'ayer' : `hace ${days} días`,
+    dated.push({
+      days,
+      record: {
+        name: exercise.name,
+        estimated1RM: `${formatKg(Math.round(best))} kg`,
+        // Bodyweight lifts were skipped above, so the load is always plate-loaded.
+        detail: formatLoad(bestSet.weightKg, bestSet.reps, false),
+      },
     });
   }
-  records.sort((a, b) => a.when.localeCompare(b.when));
+  dated.sort((a, b) => a.days - b.days);
+  const records: OverviewModel['records'] = dated.map(({ days, record }) => ({
+    ...record,
+    when: days === 0 ? 'hoy' : days === 1 ? 'ayer' : `hace ${days} días`,
+  }));
 
   // Tonnage per week, oldest to newest.
   const tonnageByWeek = new Map<string, number>();
@@ -153,12 +163,20 @@ export function buildOverview(data: Dataset, now: Date): OverviewModel {
   const daysBack = 12 * 7 + ((now.getDay() + 6) % 7);
   const start = new Date(now.getTime() - daysBack * DAY_MS);
   const heatmap: HeatmapDay[][] = [];
+  const isoDay = new Intl.DateTimeFormat('en-CA', { timeZone: TIME_ZONE });
+  const nowKey = isoDay.format(now);
   for (let i = 0; i < 91; i++) {
     const date = new Date(start.getTime() + i * DAY_MS);
     if (i % 7 === 0) heatmap.push([]);
     const column = heatmap[heatmap.length - 1];
     if (column === undefined) continue;
-    const key = new Intl.DateTimeFormat('en-CA', { timeZone: TIME_ZONE }).format(date);
+    const key = isoDay.format(date);
+    // The window ends on Sunday, so the current week carries up to six days that
+    // have not happened yet. They are blanks, not rest days.
+    if (key > nowKey) {
+      column.push({ level: 'empty', title: '' });
+      continue;
+    }
     const count = trainedDays.get(key);
     const label = new Intl.DateTimeFormat('es-ES', { timeZone: TIME_ZONE, day: 'numeric', month: 'short' }).format(date);
     if (count === undefined) {
@@ -167,10 +185,6 @@ export function buildOverview(data: Dataset, now: Date): OverviewModel {
       const level = count >= 20 ? 4 : count >= 15 ? 3 : count >= 10 ? 2 : 1;
       column.push({ level, title: `${label} · ${count} series` });
     }
-  }
-  const lastColumn = heatmap[heatmap.length - 1];
-  while (lastColumn !== undefined && lastColumn.length < 7) {
-    lastColumn.push({ level: 0, title: '' });
   }
 
   const weekFormat = new Intl.DateTimeFormat('es-ES', { timeZone: TIME_ZONE, day: 'numeric', month: 'short' });

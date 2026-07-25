@@ -1,5 +1,8 @@
+import { isoWeekKey, weeklyVolumeByMuscleGroup } from '@gym-tracker/core';
 import { describe, expect, it } from 'vitest';
-import { buildDataset } from '../data/mock';
+import { TIME_ZONE } from '../config';
+import { buildDataset, muscleGroupMap } from '../data/mock';
+import type { MockSet } from '../data/types';
 import { buildOverview } from './overview';
 
 const NOW = new Date('2026-07-25T18:00:00Z');
@@ -57,7 +60,33 @@ describe('buildOverview', () => {
   });
 
   it('still counts bodyweight lifts towards weekly volume', () => {
-    const groups = MODEL.volume.map((v) => v.group);
-    expect(groups.length).toBeGreaterThan(0);
+    const data = buildDataset(NOW);
+    const bodyweightIds = new Set(data.exercises.filter((e) => e.isBodyweight).map((e) => e.id));
+    expect(bodyweightIds.size).toBeGreaterThan(0);
+
+    const groups = muscleGroupMap(data.exercises);
+    const options = { weekKey: isoWeekKey(NOW, TIME_ZONE), timeZone: TIME_ZONE };
+    const total = (sets: readonly MockSet[]) =>
+      [...weeklyVolumeByMuscleGroup(sets, groups, options).values()].reduce((a, b) => a + b, 0);
+
+    const withBodyweight = total(data.sets);
+    const withoutBodyweight = total(data.sets.filter((s) => !bodyweightIds.has(s.exerciseId)));
+    expect(withBodyweight).toBeGreaterThan(withoutBodyweight);
+    // The model reports exactly what core counted, bodyweight sets included.
+    expect(MODEL.volume.reduce((sum, row) => sum + row.count, 0)).toBe(withBodyweight);
+  });
+
+  it('marks days that have not happened yet as blanks, not rest days', () => {
+    const cells = MODEL.heatmap.flat();
+    const empty = cells.filter((cell) => cell.level === 'empty');
+    // NOW is a Saturday, so Sunday is the only day still ahead.
+    expect(empty).toHaveLength(1);
+    for (const cell of empty) {
+      expect(cell.title).toBe('');
+    }
+    for (const cell of cells) {
+      if (cell.level === 'empty') continue;
+      expect(cell.title).not.toBe('');
+    }
   });
 });
