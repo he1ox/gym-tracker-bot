@@ -1,7 +1,34 @@
 import type { MuscleGroup } from '@gym-tracker/core';
+import { TIME_ZONE } from '../config';
 import type { Dataset, MockExercise, MockRoutine, MockSet, MockWorkout } from './types';
 
 const DAY_MS = 86_400_000;
+
+/**
+ * The instant that reads as `hour:minute` on the calendar day `daysAgo` days
+ * before `now`, as seen in `timeZone` — not the host machine's own zone.
+ * `setHours` is host-local, so on a non-Madrid machine sessions would land at
+ * the wrong wall-clock time (and sometimes the wrong day) once formatted
+ * back through `TIME_ZONE` in the presenters.
+ */
+function zonedSessionStart(now: Date, daysAgo: number, hour: number, minute: number, timeZone: string): Date {
+  const approx = new Date(now.getTime() - daysAgo * DAY_MS);
+  const [year, month, day] = new Intl.DateTimeFormat('en-CA', { timeZone }).format(approx).split('-').map(Number);
+  let guess = Date.UTC(year ?? 1970, (month ?? 1) - 1, day ?? 1, hour, minute);
+  // One correction pass is enough: the offset only shifts by the DST delta.
+  for (let i = 0; i < 2; i++) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone, hourCycle: 'h23',
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+    }).formatToParts(new Date(guess));
+    const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+    const asUTC = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour') % 24, get('minute'));
+    const diff = asUTC - guess;
+    if (diff === 0) break;
+    guess -= diff;
+  }
+  return new Date(guess);
+}
 
 interface Template {
   name: string;
@@ -217,8 +244,7 @@ export function buildDataset(now: Date = new Date()): Dataset {
 
     const latest = (occurrences.get(entry.dayName) ?? 1) - 1;
     const stepsBack = latest - entry.occurrence;
-    const startedAt = new Date(now.getTime() - entry.daysAgo * DAY_MS);
-    startedAt.setHours(18, 30, 0, 0);
+    const startedAt = zonedSessionStart(now, entry.daysAgo, 18, 30, TIME_ZONE);
 
     let cursor = startedAt.getTime();
     let position = 0;

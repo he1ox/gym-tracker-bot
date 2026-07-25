@@ -7,7 +7,9 @@ import { TIME_ZONE, VOLUME_TARGET_MAX } from '../config';
 import { muscleGroupMap } from '../data/mock';
 import type { Dataset, MockSet } from '../data/types';
 import type { HeatmapDay } from '../components/Heatmap';
-import { deltaColor, formatDelta, formatKg, formatLoad } from './format';
+import {
+  dayOfWeekInZone, deltaColor, formatDayMonthShort, formatDelta, formatKg, formatLoad, isoDateKey,
+} from './format';
 
 const DAY_MS = 86_400_000;
 
@@ -157,20 +159,19 @@ export function buildOverview(data: Dataset, now: Date): OverviewModel {
   const trainedDays = new Map<string, number>();
   for (const workout of data.workouts) {
     const sets = setsByWorkout.get(workout.id) ?? [];
-    const key = new Intl.DateTimeFormat('en-CA', { timeZone: TIME_ZONE }).format(workout.startedAt);
+    const key = isoDateKey(workout.startedAt, TIME_ZONE);
     trainedDays.set(key, effectiveSets(sets).length);
   }
-  const daysBack = 12 * 7 + ((now.getDay() + 6) % 7);
+  const daysBack = 12 * 7 + ((dayOfWeekInZone(now, TIME_ZONE) + 6) % 7);
   const start = new Date(now.getTime() - daysBack * DAY_MS);
   const heatmap: HeatmapDay[][] = [];
-  const isoDay = new Intl.DateTimeFormat('en-CA', { timeZone: TIME_ZONE });
-  const nowKey = isoDay.format(now);
+  const nowKey = isoDateKey(now, TIME_ZONE);
   for (let i = 0; i < 91; i++) {
     const date = new Date(start.getTime() + i * DAY_MS);
     if (i % 7 === 0) heatmap.push([]);
     const column = heatmap[heatmap.length - 1];
     if (column === undefined) continue;
-    const key = isoDay.format(date);
+    const key = isoDateKey(date, TIME_ZONE);
     // The window ends on Sunday, so the current week carries up to six days that
     // have not happened yet. They are blanks, not rest days.
     if (key > nowKey) {
@@ -178,7 +179,7 @@ export function buildOverview(data: Dataset, now: Date): OverviewModel {
       continue;
     }
     const count = trainedDays.get(key);
-    const label = new Intl.DateTimeFormat('es-ES', { timeZone: TIME_ZONE, day: 'numeric', month: 'short' }).format(date);
+    const label = formatDayMonthShort(date, TIME_ZONE);
     if (count === undefined) {
       column.push({ level: 0, title: `${label} · descanso` });
     } else {
@@ -187,12 +188,11 @@ export function buildOverview(data: Dataset, now: Date): OverviewModel {
     }
   }
 
-  const weekFormat = new Intl.DateTimeFormat('es-ES', { timeZone: TIME_ZONE, day: 'numeric', month: 'short' });
-  const monday = new Date(now.getTime() - ((now.getDay() + 6) % 7) * DAY_MS);
+  const monday = new Date(now.getTime() - ((dayOfWeekInZone(now, TIME_ZONE) + 6) % 7) * DAY_MS);
   const sunday = new Date(monday.getTime() + 6 * DAY_MS);
 
   return {
-    weekLabel: `${weekFormat.format(monday)} – ${weekFormat.format(sunday)}`,
+    weekLabel: `${formatDayMonthShort(monday, TIME_ZONE)} – ${formatDayMonthShort(sunday, TIME_ZONE)}`,
     kpis, stalled, volume, volumeMax, records, tonnageTrend, heatmap,
   };
 }

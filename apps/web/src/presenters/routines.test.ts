@@ -1,3 +1,4 @@
+import { MUSCLE_GROUP_LABELS } from '@gym-tracker/core';
 import { describe, expect, it } from 'vitest';
 import { buildDataset } from '../data/mock';
 import { buildRoutines, clampInt } from './routines';
@@ -38,8 +39,9 @@ describe('buildRoutines', () => {
 
   it('labels catalog entries with Spanish muscle names', () => {
     expect(MODEL.catalog.length).toBeGreaterThan(0);
+    const spanishLabels = new Set(Object.values(MUSCLE_GROUP_LABELS));
     for (const entry of MODEL.catalog) {
-      expect(entry.muscleLabel).toMatch(/[A-Za-zÁÉÍÓÚáéíóú]/);
+      expect(spanishLabels.has(entry.muscleLabel)).toBe(true);
     }
   });
 });

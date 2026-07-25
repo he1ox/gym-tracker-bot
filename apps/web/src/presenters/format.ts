@@ -24,8 +24,28 @@ export function deltaColor(value: number): string {
 
 export function formatDayMonth(date: Date, timeZone: string): string {
   const weekday = new Intl.DateTimeFormat('es-ES', { timeZone, weekday: 'short' }).format(date);
-  const dayMonth = new Intl.DateTimeFormat('es-ES', { timeZone, day: 'numeric', month: 'short' }).format(date);
+  const dayMonth = formatDayMonthShort(date, timeZone);
   return `${weekday} · ${dayMonth}`;
+}
+
+export function formatDayMonthShort(date: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat('es-ES', { timeZone, day: 'numeric', month: 'short' }).format(date);
+}
+
+/** yyyy-mm-dd calendar-date key for `date` as seen in `timeZone`, host offset irrelevant. */
+export function isoDateKey(date: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone }).format(date);
+}
+
+/**
+ * Day of week for `date` as seen in `timeZone` (0 = Sunday .. 6 = Saturday),
+ * independent of the host machine's own time zone. Derived from the
+ * timezone-correct calendar date, then read back as a UTC weekday — a
+ * calendar date's weekday is a property of the date alone, not of any clock.
+ */
+export function dayOfWeekInZone(date: Date, timeZone: string): number {
+  const [year, month, day] = isoDateKey(date, timeZone).split('-').map(Number);
+  return new Date(Date.UTC(year ?? 1970, (month ?? 1) - 1, day ?? 1)).getUTCDay();
 }
 
 export function formatClockRange(from: Date, to: Date, timeZone: string): string {

@@ -11,9 +11,12 @@ export interface ExercisePoint { weekKey: string; estimated1RM: number; isRecord
 export interface ExerciseModel {
   exerciseId: number; name: string; muscleLabel: string;
   current1RM: string; best1RM: string; totalSets: number; avgRestSeconds: number;
+  isBodyweight: boolean;
   trend: ExercisePoint[];
-  sessionVolume: Array<{ dateLabel: string; tonnage: number }>;
-  history: Array<{ dateLabel: string; dayName: string; sets: SetRow[] }>;
+  recordCount: number;
+  sessionVolume: Array<{ workoutId: number; dateLabel: string; tonnage: number; tonnageLabel: string; percent: number }>;
+  volumeMax: number;
+  history: Array<{ workoutId: number; dateLabel: string; dayName: string; sets: SetRow[] }>;
   bestEver: string; mostRecent: string;
 }
 
@@ -58,16 +61,30 @@ export function buildExercise(data: Dataset, exerciseId: number): ExerciseModel 
     })
     .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
 
-  const sessionVolume = sessions.map((workout) => ({
+  const rawSessionVolume = sessions.map((workout) => ({
+    workoutId: workout.id,
     dateLabel: formatDayMonth(workout.startedAt, TIME_ZONE),
     tonnage: sessionTonnage(own.filter((s) => s.workoutId === workout.id)),
   }));
+  const volumeMax = Math.max(1, ...rawSessionVolume.map((v) => v.tonnage));
+  const sessionVolume = rawSessionVolume.map((entry) => ({
+    ...entry,
+    tonnageLabel: `${formatKg(Math.round(entry.tonnage))} kg`,
+    percent: (entry.tonnage / volumeMax) * 100,
+  }));
 
+  // Rest is measured within a workout only: `position` restarts every
+  // workout, so gaps computed across the whole exercise history would span
+  // days. Collect the per-workout gaps (like `history` below does) and
+  // average those, never the raw cross-workout deltas.
+  const allRestValues: number[] = [];
   const history = sessions.map((workout) => {
     const sets = own.filter((s) => s.workoutId === workout.id).sort((a, b) => a.position - b.position);
     const rests = deriveRestSeconds(sets);
+    allRestValues.push(...rests.filter((r): r is number => r !== undefined));
     let index = 0;
     return {
+      workoutId: workout.id,
       dateLabel: formatDayMonth(workout.startedAt, TIME_ZONE),
       dayName: workout.dayName,
       sets: sets.map((set, i): SetRow => {
@@ -84,8 +101,6 @@ export function buildExercise(data: Dataset, exerciseId: number): ExerciseModel 
     };
   });
 
-  const restValues = deriveRestSeconds(own).filter((r): r is number => r !== undefined);
-
   const bestSet = exercise.isBodyweight
     ? [...working].sort((a, b) => b.weightKg - a.weightKg || b.reps - a.reps)[0]
     : [...working].sort((a, b) => oneRM(b) - oneRM(a))[0];
@@ -99,11 +114,14 @@ export function buildExercise(data: Dataset, exerciseId: number): ExerciseModel 
     current1RM: exercise.isBodyweight ? '—' : `${formatKg(Math.round(latestWeek?.estimated1RM ?? 0))} kg`,
     best1RM: exercise.isBodyweight ? '—' : `${formatKg(Math.round(running))} kg`,
     totalSets: working.length,
-    avgRestSeconds: restValues.length === 0
+    avgRestSeconds: allRestValues.length === 0
       ? 0
-      : Math.round(restValues.reduce((a, b) => a + b, 0) / restValues.length),
+      : Math.round(allRestValues.reduce((a, b) => a + b, 0) / allRestValues.length),
+    isBodyweight: exercise.isBodyweight,
     trend,
+    recordCount: trend.filter((p) => p.isRecord).length,
     sessionVolume,
+    volumeMax,
     history,
     bestEver: bestSet === undefined ? '—' : formatLoad(bestSet.weightKg, bestSet.reps, exercise.isBodyweight),
     mostRecent: latestSet === undefined ? '—' : formatLoad(latestSet.weightKg, latestSet.reps, exercise.isBodyweight),

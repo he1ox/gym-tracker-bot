@@ -12,10 +12,13 @@ describe('buildSessions', () => {
   });
 
   it('lists sessions newest first', () => {
-    const first = MODEL.summaries[0];
-    const second = MODEL.summaries[1];
-    expect(first).toBeDefined();
-    expect(second).toBeDefined();
+    expect(MODEL.summaries.length).toBeGreaterThan(1);
+    const data = buildDataset(NOW);
+    const byId = new Map(data.workouts.map((w) => [w.id, w]));
+    const timestamps = MODEL.summaries.map((s) => byId.get(s.id)?.startedAt.getTime());
+    for (const t of timestamps) expect(t).toBeDefined();
+    const sorted = [...timestamps].sort((a, b) => (b ?? 0) - (a ?? 0));
+    expect(timestamps).toEqual(sorted);
   });
 
   it('compares against the previous session of the same routine day', () => {

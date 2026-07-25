@@ -1,8 +1,9 @@
 import { isoWeekKey, weeklyVolumeByMuscleGroup } from '@gym-tracker/core';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { TIME_ZONE } from '../config';
 import { buildDataset, muscleGroupMap } from '../data/mock';
 import type { MockSet } from '../data/types';
+import { dayOfWeekInZone } from './format';
 import { buildOverview } from './overview';
 
 const NOW = new Date('2026-07-25T18:00:00Z');
@@ -79,8 +80,12 @@ describe('buildOverview', () => {
   it('marks days that have not happened yet as blanks, not rest days', () => {
     const cells = MODEL.heatmap.flat();
     const empty = cells.filter((cell) => cell.level === 'empty');
-    // NOW is a Saturday, so Sunday is the only day still ahead.
-    expect(empty).toHaveLength(1);
+    // Derived independently from NOW's Madrid weekday, not hardcoded: the
+    // heatmap's last column is the current week, Monday-first, so every day
+    // strictly after today within that week is still a blank.
+    const mondayIndex = (dayOfWeekInZone(NOW, TIME_ZONE) + 6) % 7; // 0 = Monday
+    const expectedEmpty = 6 - mondayIndex;
+    expect(empty).toHaveLength(expectedEmpty);
     for (const cell of empty) {
       expect(cell.title).toBe('');
     }
@@ -88,5 +93,37 @@ describe('buildOverview', () => {
       if (cell.level === 'empty') continue;
       expect(cell.title).not.toBe('');
     }
+  });
+
+  describe('time zone independence (F3)', () => {
+    const originalTZ = process.env.TZ;
+    afterEach(() => {
+      if (originalTZ === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTZ;
+    });
+
+    it('anchors the heatmap and week label to Madrid days regardless of host offset', () => {
+      // now = 2026-11-15T00:30Z reads as Sunday 01:30 in Madrid but Saturday
+      // 18:30 on a UTC-6 host — the exact mismatch that produced a Tuesday
+      // first column and an off-by-one week label before the fix.
+      const now = new Date('2026-11-15T00:30:00Z');
+
+      process.env.TZ = 'America/Chicago';
+      const hostOffsetModel = buildOverview(buildDataset(now), now);
+
+      process.env.TZ = 'Europe/Madrid';
+      const madridHostModel = buildOverview(buildDataset(now), now);
+
+      expect(hostOffsetModel.heatmap).toEqual(madridHostModel.heatmap);
+      expect(hostOffsetModel.weekLabel).toBe(madridHostModel.weekLabel);
+
+      // Independently confirm the first heatmap column truly starts on a
+      // Monday in Madrid: the Madrid weekday for `now` is Sunday, so the
+      // heatmap window (12 full weeks plus the days elapsed this week) starts
+      // exactly 6 days earlier, on a Monday.
+      const start = new Date(now.getTime() - (12 * 7 + 6) * 86_400_000);
+      const startWeekday = new Intl.DateTimeFormat('en-US', { timeZone: TIME_ZONE, weekday: 'long' }).format(start);
+      expect(startWeekday).toBe('Monday');
+    });
   });
 });
