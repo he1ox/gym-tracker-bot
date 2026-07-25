@@ -10,7 +10,7 @@ export const T = {
 
   // Selección de ejercicio (estado 2)
   chooseExercisePrompt: 'Elige un ejercicio:',
-  otherExerciseButton: '➕ Otro ejercicio',
+  otherExerciseButton: '📂 Otro ejercicio',
   typeExerciseName: 'Escribe el nombre del ejercicio a añadir.',
 
   // En ejercicio (estado 3)
@@ -52,7 +52,7 @@ export const T = {
     return `⏱ Descanso terminado — ${exerciseName}`;
   },
   noMatch(query: string): string {
-    return `No encontré "${query}". Créalo con /routines.`;
+    return `No encontré "${query}".`;
   },
   estimatedRecordLabel: '1RM est.',
   setsSummary(count: number): string {
@@ -96,6 +96,21 @@ export const T = {
   },
   lastBest(kg: string): string {
     return `Mejor 1RM estimado: ${kg} kg`;
+  },
+
+  // Selector de ejercicios por grupo muscular (Fase 2)
+  pickChooseGroup: 'Elige un grupo muscular:',
+  pickSearchButton: '🔍 Buscar por nombre',
+  pickBackButton: '‹ Volver',
+  pickPrevButton: '‹ Anterior',
+  pickNextButton: 'Siguiente ›',
+  pickByGroupButton: '📂 Ver por grupo',
+  pickAmbiguous: '¿Cuál de estos?',
+  pickEmpty: 'No hay ejercicios disponibles.',
+  pickTypeName: 'Escribe el nombre del ejercicio.',
+  exerciseGoneToast: 'Ese ejercicio ya no está disponible.',
+  pickGroupTitle(label: string): string {
+    return `${label} — elige un ejercicio:`;
   },
 };
 
