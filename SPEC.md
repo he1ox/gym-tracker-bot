@@ -65,10 +65,15 @@ violando la arquitectura.
 | Base de datos | SQLite mediante `node:sqlite` o `bun:sqlite` |
 | ORM y migraciones | Drizzle ORM + Drizzle Kit |
 | Frontend | Vite + React + TypeScript |
-| Estilos | Tailwind + shadcn/ui |
-| Gráficas | Recharts |
-| Tests | Vitest |
+| Estilos | CSS plano con custom properties (sistema de diseño Nocturne) |
+| Gráficas | SVG escrito a mano |
+| Enrutado del dashboard | router propio sobre `hashchange` |
+| Tests | Vitest + Testing Library |
 | Monorepo | pnpm workspaces |
+
+Las tres filas de estilos, gráficas y enrutado se apartan de la intención original
+(Tailwind + shadcn/ui, Recharts, `react-router`). El motivo y la contrapartida de cada una
+están en `DECISIONS.md`.
 
 **Prohibido usar `better-sqlite3`** ni cualquier otro módulo nativo que requiera compilación
 en la máquina del usuario: rompe las instalaciones de quien no tiene compilador.
