@@ -157,15 +157,16 @@ export default defineConfig({
 
 - [ ] **Step 4: Copiar la hoja del sistema de diseño**
 
-Crear `apps/web/src/styles/nocturne.css` con el contenido íntegro de
-`_ds/nocturne-85224748-c7be-45fd-b1c5-e49dc939a885/styles.css` del proyecto de diseño
-`793b55ba-f555-423a-97c3-a42d81c862bf`. Se copia **sin modificar**, incluida la primera
-línea `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');`
-— decisión explícita del autor, registrada en el spec §3.
+El archivo ya está descargado del proyecto de diseño y espera en el workspace del plan:
 
-Si el archivo no está a mano, recuperarlo con el MCP `claude_design`:
-`DesignSync` método `get_file`, `projectId: 793b55ba-f555-423a-97c3-a42d81c862bf`,
-`path: _ds/nocturne-85224748-c7be-45fd-b1c5-e49dc939a885/styles.css`.
+```bash
+cp .superpowers/sdd/2026-07-24-dashboard-ui/assets/nocturne.css apps/web/src/styles/nocturne.css
+```
+
+Se copia **sin modificar**, incluida la primera línea
+`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');`
+— decisión explícita del autor, registrada en el spec §3. No editar esa línea ni sustituir
+la fuente por una local.
 
 - [ ] **Step 5: Escribir el test de configuración**
 
@@ -641,7 +642,7 @@ export interface Dataset {
 `apps/web/src/data/mock.test.ts`:
 
 ```ts
-import { effectiveSets, sessionTonnage, session1RM, weeklyVolumeByMuscleGroup, isoWeekKey } from '@gym-tracker/core';
+import { detectStagnation, effectiveSets, sessionTonnage, session1RM, weeklyVolumeByMuscleGroup, isoWeekKey } from '@gym-tracker/core';
 import { describe, expect, it } from 'vitest';
 import { TIME_ZONE } from '../config';
 import { buildDataset, muscleGroupMap } from './mock';
@@ -699,6 +700,32 @@ describe('buildDataset', () => {
     const { routines } = buildDataset(NOW);
     expect(routines.filter((r) => r.isActive)).toHaveLength(1);
     expect(routines.some((r) => r.archived)).toBe(true);
+  });
+
+  it('leaves some lifts genuinely stagnant for detectStagnation to find', () => {
+    const data = buildDataset(NOW);
+    const bench = data.exercises.find((e) => e.name === 'Press banca');
+    expect(bench).toBeDefined();
+    if (bench === undefined) return;
+
+    const result = detectStagnation(
+      data.sets.filter((s) => s.exerciseId === bench.id),
+      { timeZone: TIME_ZONE },
+    );
+    expect(result.stagnant).toBe(true);
+  });
+
+  it('keeps other lifts progressing', () => {
+    const data = buildDataset(NOW);
+    const press = data.exercises.find((e) => e.name === 'Prensa');
+    expect(press).toBeDefined();
+    if (press === undefined) return;
+
+    const result = detectStagnation(
+      data.sets.filter((s) => s.exerciseId === press.id),
+      { timeZone: TIME_ZONE },
+    );
+    expect(result.stagnant).toBe(false);
   });
 });
 ```
@@ -789,9 +816,23 @@ const SCHEDULE: ReadonlyArray<{ daysAgo: number; dayName: string; notes?: string
 
 const COMPOUND = /banca|militar|peso muerto|remo con barra|sentadilla|dominadas/i;
 
+/**
+ * Lifts that stopped progressing. Their weight is flat across the most recent
+ * PLATEAU_SESSIONS + 1 occurrences, so detectStagnation has something real to
+ * find — the stagnation block is the headline of the overview screen.
+ */
+const PLATEAUED = new Set(['Press banca', 'Press militar', 'Remo con barra']);
+const PLATEAU_SESSIONS = 5;
+
 function increment(template: Template): number {
   if (COMPOUND.test(template.name)) return 2.5;
   return template.weightKg > 60 ? 5 : 1;
+}
+
+/** Newest session is 0. Plateaued lifts collapse their recent steps to zero. */
+function progressionSteps(template: Template, stepsBack: number): number {
+  if (!PLATEAUED.has(template.name)) return stepsBack;
+  return Math.max(0, stepsBack - PLATEAU_SESSIONS);
 }
 
 function buildExercises(): MockExercise[] {
@@ -896,7 +937,7 @@ export function buildDataset(now: Date = new Date()): Dataset {
     for (const template of templates) {
       const weight = template.isBodyweight === true
         ? template.weightKg
-        : Math.max(0, template.weightKg - increment(template) * stepsBack);
+        : Math.max(0, template.weightKg - increment(template) * progressionSteps(template, stepsBack));
 
       for (const [warmWeight, warmReps] of template.warmups ?? []) {
         cursor += 60_000;
@@ -1350,10 +1391,18 @@ describe('buildOverview', () => {
     }
   });
 
+  it('surfaces the stalled lifts the dataset plateaus', () => {
+    expect(MODEL.stalled.length).toBeGreaterThan(0);
+    expect(MODEL.stalled.map((s) => s.name)).toContain('Press banca');
+  });
+
   it('never invents coaching advice, only measured weeks', () => {
+    expect(MODEL.stalled.length).toBeGreaterThan(0);
     for (const item of MODEL.stalled) {
       expect(item.weeks).toBeGreaterThanOrEqual(3);
       expect(item.workingSet).toMatch(/×/);
+      // The mockup's "Deload to 90 kg" line is not part of the model.
+      expect(Object.keys(item)).not.toContain('advice');
     }
   });
 
