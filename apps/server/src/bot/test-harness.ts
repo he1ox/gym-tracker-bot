@@ -83,6 +83,18 @@ export function commandUpdate(updateId: number, command: string, fromId = 111): 
   return textUpdate(updateId, `/${command}`, fromId);
 }
 
+// Textos enviados/editados por el bot para un método dado (sendMessage, editMessageText…).
+export function outgoingTexts(outgoing: readonly OutgoingCall[], method: string): string[] {
+  return outgoing.filter((c) => c.method === method).map((c) => String(c.payload.text ?? ''));
+}
+
+// callback_data de los botones de la última llamada al método indicado.
+export function lastKeyboardDatas(outgoing: readonly OutgoingCall[], method: string): string[] {
+  const call = outgoing.filter((c) => c.method === method).at(-1);
+  const markup = call?.payload.reply_markup as { inline_keyboard?: Array<Array<{ callback_data?: string }>> } | undefined;
+  return (markup?.inline_keyboard ?? []).flat().map((b) => b.callback_data ?? '');
+}
+
 export function callbackUpdate(updateId: number, data: string, messageId: number, fromId = 111): AnyUpdate {
   return {
     update_id: updateId,

@@ -4,7 +4,9 @@ import {
   createCustomExercise,
   createRoutine,
   createRoutineDay,
+  getExerciseById,
   listCatalogAndOwn,
+  listExercisesByMuscleGroup,
   listRoutines,
   setActiveRoutine,
 } from '@gym-tracker/db';
@@ -12,7 +14,9 @@ import { type Conversation, conversations, createConversation } from '@grammyjs/
 import { type Bot, type Context, InlineKeyboard } from 'grammy';
 import type { DatabaseSync } from 'node:sqlite';
 import { matchExercise } from '../services/exercise-match';
+import { CB, parseCallback } from './callback-data';
 import type { CustomContext } from './context';
+import { type PickerState, renderCandidates, renderNoMatch, renderPicker } from './exercise-picker';
 import { T } from './texts';
 
 // OC=CustomContext (contexto exterior, con `.user` ya autenticado por `auth`, accesible
@@ -91,6 +95,59 @@ function makeWizard(db: DatabaseSync) {
   };
 }
 
+// Borra un mensaje de menú previo sin abortar el wizard si ya no existe (chat
+// limpio: spec §4 "No quedan menús muertos en el chat"). Las llamadas a
+// ctx.api dentro de la conversación pasan por el motor de replay de
+// @grammyjs/conversations (ver hydrateContext en su plugin.js), que registra
+// el resultado y lo repite en cada replay en vez de volver a borrar: es
+// seguro llamarla desde una función que se reejecuta desde el principio.
+async function deleteMenuMessage(ctx: Context, messageId: number | null): Promise<void> {
+  const chatId = ctx.chat?.id;
+  if (messageId === null || chatId === undefined) {
+    return;
+  }
+  await ctx.api.deleteMessage(chatId, messageId).catch(() => {});
+}
+
+// Devuelve el id elegido, o undefined si el usuario pidió buscar por nombre.
+// TODA lectura de base de datos va en conversation.external: el motor de replay
+// reejecuta esta función desde el principio en cada update.
+// priorMenuMessageId: mensaje de menú (no-match/candidatos) que precedió a esta
+// pantalla, si lo hay, para borrarlo antes de pintar la primera pantalla de grupos.
+async function pickExerciseByGroup(
+  conversation: WizardConversation,
+  ctx: Context,
+  db: DatabaseSync,
+  userId: number,
+  priorMenuMessageId: number | null,
+): Promise<number | undefined> {
+  let state: PickerState = { view: 'groups' };
+  let toDelete = priorMenuMessageId;
+  for (;;) {
+    const view = await conversation.external(() =>
+      renderPicker(state, 'c', listExercisesByMuscleGroup(db, userId)),
+    );
+    await deleteMenuMessage(ctx, toDelete);
+    const sent = await ctx.reply(view.text, { reply_markup: view.keyboard });
+    toDelete = sent.message_id;
+    const resp = await conversation.waitForCallbackQuery(/^pick:c:/);
+    await resp.answerCallbackQuery();
+    const action = parseCallback(resp.callbackQuery.data ?? '');
+    if (action.type === 'pick_exercise') {
+      await deleteMenuMessage(ctx, sent.message_id);
+      return action.exerciseId;
+    }
+    if (action.type === 'pick_search') {
+      await deleteMenuMessage(ctx, sent.message_id);
+      return undefined;
+    }
+    state =
+      action.type === 'pick_group'
+        ? { view: 'group', groupIndex: action.groupIndex, offset: action.offset }
+        : { view: 'groups' };
+  }
+}
+
 async function addExercisesToDay(
   conversation: WizardConversation,
   ctx: Context,
@@ -102,6 +159,8 @@ async function addExercisesToDay(
   for (;;) {
     await ctx.reply(T.dayAskExercise, {
       reply_markup: new InlineKeyboard()
+        .text(T.pickByGroupButton, CB.pickGroups('c'))
+        .row()
         .text(T.createOwnButton, 'wizard:createown')
         .row()
         .text(T.doneButton, 'wizard:daydone'),
@@ -117,6 +176,12 @@ async function addExercisesToDay(
     if (data === 'wizard:createown') {
       await resp.answerCallbackQuery();
       exerciseId = await createOwnExercise(conversation, ctx, db, userId);
+    } else if (data !== undefined && data.startsWith('pick:c:')) {
+      await resp.answerCallbackQuery();
+      exerciseId = await pickExerciseByGroup(conversation, ctx, db, userId, null);
+      if (exerciseId === undefined) {
+        continue; // el usuario pidió buscar por nombre: vuelve al prompt de texto
+      }
     } else if (resp.message?.text) {
       const query = resp.message.text.trim();
       const pool = await conversation.external(() =>
@@ -124,18 +189,29 @@ async function addExercisesToDay(
       );
       const match = matchExercise(query, pool);
       if (match.kind === 'none') {
-        await ctx.reply(T.noMatch(query));
-        continue;
-      }
-      if (match.kind === 'ambiguous') {
-        const kb = new InlineKeyboard();
-        for (const candidate of match.candidates.slice(0, 8)) {
-          kb.text(candidate.name, `wizard:pick:${candidate.id}`).row();
+        const view = renderNoMatch(query, 'c');
+        const sentNoMatch = await ctx.reply(view.text, { reply_markup: view.keyboard });
+        const back = await conversation.waitForCallbackQuery(/^pick:c:g$/);
+        await back.answerCallbackQuery();
+        exerciseId = await pickExerciseByGroup(conversation, ctx, db, userId, sentNoMatch.message_id);
+        if (exerciseId === undefined) {
+          continue;
         }
-        await ctx.reply(T.ambiguousMatch, { reply_markup: kb });
-        const pickCtx = await conversation.waitForCallbackQuery(/^wizard:pick:(\d+)$/);
+      } else if (match.kind === 'ambiguous') {
+        const view = renderCandidates(match.candidates, 'c');
+        const sentCandidates = await ctx.reply(view.text, { reply_markup: view.keyboard });
+        const pickCtx = await conversation.waitForCallbackQuery(/^pick:c:/);
         await pickCtx.answerCallbackQuery();
-        exerciseId = Number(pickCtx.match?.[1]);
+        const action = parseCallback(pickCtx.callbackQuery.data ?? '');
+        if (action.type === 'pick_exercise') {
+          exerciseId = action.exerciseId;
+          await deleteMenuMessage(ctx, sentCandidates.message_id);
+        } else {
+          exerciseId = await pickExerciseByGroup(conversation, ctx, db, userId, sentCandidates.message_id);
+          if (exerciseId === undefined) {
+            continue;
+          }
+        }
       } else {
         exerciseId = match.exercise.id;
       }
@@ -144,6 +220,15 @@ async function addExercisesToDay(
     }
 
     if (exerciseId === undefined || Number.isNaN(exerciseId)) {
+      continue;
+    }
+
+    // El ejercicio pudo archivarse entre pintar el menú y pulsarlo (mismo riesgo
+    // que capture.ts/last.ts): avisamos y dejamos elegir de nuevo en vez de
+    // insertar un id huérfano en la rutina.
+    const picked = await conversation.external(() => getExerciseById(db, exerciseId as number));
+    if (!picked || picked.archived) {
+      await ctx.reply(T.exerciseGoneToast);
       continue;
     }
 
