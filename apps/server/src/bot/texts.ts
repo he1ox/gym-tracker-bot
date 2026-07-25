@@ -79,9 +79,6 @@ export const T = {
   routineCreated(name: string): string {
     return `Rutina "${name}" creada.`;
   },
-  exerciseAdded(name: string): string {
-    return `Añadido: ${name}.`;
-  },
 
   // /last command (Task 16)
   lastNoHistory(name: string): string {
@@ -104,6 +101,7 @@ export const T = {
   pickAmbiguous: '¿Cuál de estos?',
   pickEmpty: 'No hay ejercicios disponibles.',
   pickTypeName: 'Escribe el nombre del ejercicio.',
+  lastSearchToast: 'Para buscar por nombre usa /last <nombre>.',
   exerciseGoneToast: 'Ese ejercicio ya no está disponible.',
   pickGroupTitle(label: string): string {
     return `${label} — elige un ejercicio:`;

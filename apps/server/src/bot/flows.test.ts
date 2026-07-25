@@ -21,7 +21,7 @@ import {
   runMigrations,
   setActiveRoutine,
 } from '@gym-tracker/db';
-import { BOT_INFO, callbackUpdate, commandUpdate, makeHarness, textUpdate } from './test-harness';
+import { BOT_INFO, callbackUpdate, commandUpdate, lastKeyboardDatas, makeHarness, outgoingTexts, textUpdate } from './test-harness';
 
 const CONFIG = { allowedTelegramIds: [111], timezone: 'UTC' };
 const MSG = 500; // message_id estable del mensaje activo en los callbacks
@@ -31,20 +31,6 @@ function baseDb() {
   runMigrations(d, MIGRATIONS_DIR);
   createUser(d, { telegramUserId: 111, timezone: 'UTC', createdAt: 0 });
   return d;
-}
-
-function texts(outgoing: Array<{ method: string; payload: Record<string, unknown> }>, method: string): string[] {
-  return outgoing.filter((c) => c.method === method).map((c) => String(c.payload.text ?? ''));
-}
-
-// callback_data de los botones de la última llamada al método indicado.
-function lastKeyboardDatas(
-  outgoing: Array<{ method: string; payload: Record<string, unknown> }>,
-  method: string,
-): string[] {
-  const call = outgoing.filter((c) => c.method === method).at(-1);
-  const markup = call?.payload.reply_markup as { inline_keyboard?: Array<Array<{ callback_data?: string }>> } | undefined;
-  return (markup?.inline_keyboard ?? []).flat().map((b) => b.callback_data ?? '');
 }
 
 describe('capture regression flows', () => {
@@ -95,7 +81,7 @@ describe('capture regression flows', () => {
     await bot.handleUpdate(textUpdate(4, '60x')); // faltan reps
     const workout = getActiveWorkout(d, 1)!;
     expect(listSetsForWorkout(d, workout.id)).toHaveLength(0);
-    expect(texts(outgoing, 'sendMessage').some((t) => t.includes('repeticiones'))).toBe(true);
+    expect(outgoingTexts(outgoing, 'sendMessage').some((t) => t.includes('repeticiones'))).toBe(true);
   });
 
   it('ignores updates from unauthorized ids', async () => {
@@ -191,7 +177,7 @@ describe('exercise picker in the capture flow', () => {
 
     await bot.handleUpdate(textUpdate(3, 'polea')); // varios candidatos en el catálogo
 
-    const all = [...texts(outgoing, 'sendMessage'), ...texts(outgoing, 'editMessageText')].join('\n');
+    const all = [...outgoingTexts(outgoing, 'sendMessage'), ...outgoingTexts(outgoing, 'editMessageText')].join('\n');
     expect(all).not.toContain('Sé más específico');
     const datas = [...lastKeyboardDatas(outgoing, 'editMessageText'), ...lastKeyboardDatas(outgoing, 'sendMessage')];
     expect(datas.some((x) => x.startsWith('pick:c:x:'))).toBe(true);
@@ -206,7 +192,7 @@ describe('exercise picker in the capture flow', () => {
 
     await bot.handleUpdate(callbackUpdate(3, 'add', MSG));
 
-    expect(texts(outgoing, 'editMessageText').join('\n')).toContain('grupo muscular');
+    expect(outgoingTexts(outgoing, 'editMessageText').join('\n')).toContain('grupo muscular');
     expect(lastKeyboardDatas(outgoing, 'editMessageText').some((x) => x.startsWith('pick:c:g:'))).toBe(true);
   });
 
@@ -230,7 +216,7 @@ describe('exercise picker in the capture flow', () => {
     expect(getSession(d, 1)?.currentExerciseId).toBe(first.id);
     // Edición in place: nada de mensajes nuevos para la vista principal.
     expect(outgoing.filter((c) => c.method === 'editMessageText').length).toBeGreaterThan(0);
-    expect(texts(outgoing, 'editMessageText').join('\n')).toContain(first.name);
+    expect(outgoingTexts(outgoing, 'editMessageText').join('\n')).toContain(first.name);
   });
 
   it('goes back from a group to the group list', async () => {
@@ -243,7 +229,7 @@ describe('exercise picker in the capture flow', () => {
     outgoing.length = 0;
 
     await bot.handleUpdate(callbackUpdate(4, 'pick:c:g', MSG));
-    expect(texts(outgoing, 'editMessageText').join('\n')).toContain('grupo muscular');
+    expect(outgoingTexts(outgoing, 'editMessageText').join('\n')).toContain('grupo muscular');
   });
 
   it('warns and repaints the group menu when the chosen exercise is gone', async () => {
@@ -271,7 +257,7 @@ describe('exercise picker in the capture flow', () => {
 
     await bot.handleUpdate(textUpdate(3, 'zancada rusa inexistente'));
 
-    expect(texts(outgoing, 'sendMessage').join('\n')).toContain('No encontré');
+    expect(outgoingTexts(outgoing, 'sendMessage').join('\n')).toContain('No encontré');
     expect(lastKeyboardDatas(outgoing, 'sendMessage')).toContain('pick:c:g');
   });
 
@@ -282,5 +268,24 @@ describe('exercise picker in the capture flow', () => {
     await bot.handleUpdate(callbackUpdate(2, 'free', MSG));
     await bot.handleUpdate(callbackUpdate(3, 'pick:l:x:1', MSG));
     expect(getSession(d, 1)?.currentExerciseId).toBeNull();
+  });
+
+  it('lets typing a name after opening the picker search switch exercise mid-workout (F3)', async () => {
+    const d = baseDb();
+    const target = listExercisesByMuscleGroup(d, 1).get('lats')!.find((e) => e.name.includes('Jalón'))!;
+    const { bot, outgoing } = makeHarness(d, BOT_INFO, CONFIG);
+    await bot.handleUpdate(commandUpdate(1, 'start'));
+    await bot.handleUpdate(callbackUpdate(2, 'free', MSG));
+    await bot.handleUpdate(callbackUpdate(3, 'ex:1', MSG)); // ejercicio en curso
+    await bot.handleUpdate(callbackUpdate(4, 'pick:c:g', MSG)); // abre el selector por grupo
+    await bot.handleUpdate(callbackUpdate(5, 'pick:c:s', MSG)); // "Buscar por nombre"
+    outgoing.length = 0;
+
+    await bot.handleUpdate(textUpdate(6, 'jalon'));
+
+    // Antes del fix: el texto se interpretaba como peso×reps del ejercicio 1
+    // ("No entendí...") y el ejercicio activo no cambiaba.
+    expect(outgoingTexts(outgoing, 'sendMessage').join('\n')).not.toContain('No entendí');
+    expect(getSession(d, 1)?.currentExerciseId).toBe(target.id);
   });
 });

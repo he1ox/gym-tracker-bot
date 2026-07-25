@@ -9,7 +9,7 @@ const MAX_CANDIDATES = 8;
 
 export type PickerState = { view: 'groups' } | { view: 'group'; groupIndex: number; offset: number };
 
-export interface Rendered {
+interface Rendered {
   text: string;
   keyboard: InlineKeyboard;
 }

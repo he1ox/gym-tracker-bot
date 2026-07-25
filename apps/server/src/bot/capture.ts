@@ -283,6 +283,10 @@ async function handleCallback(ctx: CustomContext, db: DatabaseSync, restTimers: 
         await ctx.answerCallbackQuery();
         return;
       }
+      // Entrar al menú de grupos es, igual que 'add', empezar a elegir ejercicio:
+      // sin esto el texto sin serie válida que llegue después (p. ej. desde
+      // 'pick_search') se interpretaría como peso×reps del ejercicio anterior.
+      updateSession(db, userId, { currentExerciseId: null }, now);
       await showPicker(ctx.api, db, session, { view: 'groups' });
       await ctx.answerCallbackQuery();
       return;
@@ -321,6 +325,9 @@ async function handleCallback(ctx: CustomContext, db: DatabaseSync, restTimers: 
         await ctx.answerCallbackQuery();
         return;
       }
+      // Igual que 'pick_groups': entrar al modo búsqueda es elegir ejercicio, así
+      // que el texto que escriba a continuación no debe parsearse como serie.
+      updateSession(db, userId, { currentExerciseId: null }, now);
       await sendEphemeral(ctx.api, db, session, T.pickTypeName);
       await ctx.answerCallbackQuery();
       return;

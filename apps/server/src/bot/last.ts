@@ -98,7 +98,11 @@ export function registerLast(bot: Bot<CustomContext>, db: DatabaseSync, config: 
     const userId = ctx.user.id;
 
     if (action.type === 'pick_search') {
-      await ctx.answerCallbackQuery(T.pickTypeName);
+      // /last no registra un listener de texto libre: pedir que escriba aquí
+      // dejaría el nombre cayendo en el handler de captura (y, con una sesión
+      // activa, cambiando de ejercicio en un entrenamiento en curso). En vez de
+      // eso avisamos de la sintaxis que sí funciona.
+      await ctx.answerCallbackQuery(T.lastSearchToast);
       return;
     }
     if (action.type === 'pick_groups' || action.type === 'pick_group') {
