@@ -789,7 +789,7 @@ const DAY_TEMPLATES: Record<string, readonly Template[]> = {
   ],
 };
 
-const SCHEDULE: ReadonlyArray<{ daysAgo: number; dayName: string; notes?: string }> = [
+const RECENT_SCHEDULE: ReadonlyArray<{ daysAgo: number; dayName: string; notes?: string }> = [
   { daysAgo: 1, dayName: 'Tirón', notes: 'El agarre falló en la última serie de peso muerto. La próxima, con correas.' },
   { daysAgo: 2, dayName: 'Pierna' },
   { daysAgo: 3, dayName: 'Empuje' },
@@ -814,6 +814,32 @@ const SCHEDULE: ReadonlyArray<{ daysAgo: number; dayName: string; notes?: string
   { daysAgo: 30, dayName: 'Empuje' },
 ];
 
+/**
+ * Older sessions, generated: the same three-day cycle stretching back about
+ * thirteen weeks. SPEC §8.1 asks for a tonnage trend over the last 8-12 weeks
+ * and a three-month consistency heatmap, which the recent block alone cannot
+ * fill — it only spans five ISO weeks.
+ */
+function olderSchedule(): Array<{ daysAgo: number; dayName: string }> {
+  const cycle = ['Empuje', 'Tirón', 'Pierna'] as const;
+  const out: Array<{ daysAgo: number; dayName: string }> = [];
+  let index = 0;
+  let daysAgo = 33;
+  while (daysAgo <= 90) {
+    const dayName = cycle[index % cycle.length];
+    if (dayName !== undefined) out.push({ daysAgo, dayName });
+    index++;
+    // A rest day after each completed cycle.
+    daysAgo += index % cycle.length === 0 ? 3 : 2;
+  }
+  return out;
+}
+
+const SCHEDULE: ReadonlyArray<{ daysAgo: number; dayName: string; notes?: string }> = [
+  ...RECENT_SCHEDULE,
+  ...olderSchedule(),
+];
+
 const COMPOUND = /banca|militar|peso muerto|remo con barra|sentadilla|dominadas/i;
 
 /**
@@ -833,6 +859,15 @@ function increment(template: Template): number {
 function progressionSteps(template: Template, stepsBack: number): number {
   if (!PLATEAUED.has(template.name)) return stepsBack;
   return Math.max(0, stepsBack - PLATEAU_SESSIONS);
+}
+
+/**
+ * The oldest sessions must not walk a light lift down to zero: core's
+ * estimate1RM rejects a non-positive weight. Floor every loaded lift at 40% of
+ * its current working weight, rounded to the nearest half kilo.
+ */
+function floorWeight(baseKg: number): number {
+  return Math.max(1, Math.round(baseKg * 0.4 * 2) / 2);
 }
 
 function buildExercises(): MockExercise[] {
@@ -937,7 +972,10 @@ export function buildDataset(now: Date = new Date()): Dataset {
     for (const template of templates) {
       const weight = template.isBodyweight === true
         ? template.weightKg
-        : Math.max(0, template.weightKg - increment(template) * progressionSteps(template, stepsBack));
+        : Math.max(
+            floorWeight(template.weightKg),
+            template.weightKg - increment(template) * progressionSteps(template, stepsBack),
+          );
 
       for (const [warmWeight, warmReps] of template.warmups ?? []) {
         cursor += 60_000;
@@ -1406,8 +1444,19 @@ describe('buildOverview', () => {
     }
   });
 
-  it('plots a tonnage trend with one point per week', () => {
+  it('plots a tonnage trend with one point per week, over SPEC §8.1 8-12 weeks', () => {
     expect(MODEL.tonnageTrend.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it('excludes bodyweight lifts from every 1RM-derived section', () => {
+    expect(MODEL.stalled.map((s) => s.name)).not.toContain('Dominadas');
+    expect(MODEL.stalled.map((s) => s.name)).not.toContain('Fondos');
+    expect(MODEL.records.map((r) => r.name)).not.toContain('Dominadas');
+  });
+
+  it('still counts bodyweight lifts towards weekly volume', () => {
+    const groups = MODEL.volume.map((v) => v.group);
+    expect(groups.length).toBeGreaterThan(0);
   });
 });
 ```
@@ -1501,8 +1550,15 @@ export function buildOverview(data: Dataset, now: Date): OverviewModel {
   const volumeMax = Math.max(VOLUME_TARGET_MAX + 4, ...volume.map((v) => v.count));
 
   // Stagnation, per exercise, from core.
+  //
+  // Bodyweight lifts are excluded from every 1RM-derived figure. Their sets
+  // carry weightKg 0 (or just the added plates), and the schema has nowhere to
+  // record the athlete's own weight, so an estimated 1RM for a pull-up would be
+  // a number we invented. They still count for volume, tonnage and history.
+  // Revisit when the user's bodyweight becomes a stored field.
   const stalled: OverviewModel['stalled'] = [];
   for (const exercise of data.exercises) {
+    if (exercise.isBodyweight) continue;
     const sets = data.sets.filter((s) => s.exerciseId === exercise.id);
     if (sets.length === 0) continue;
     const result = detectStagnation(sets, { timeZone: TIME_ZONE });
@@ -1515,7 +1571,7 @@ export function buildOverview(data: Dataset, now: Date): OverviewModel {
     const byWeek = new Map<string, number>();
     for (const set of working) {
       const key = weekOf(set.createdAt);
-      const value = estimate1RM(set.weightKg > 0 ? set.weightKg : 1, set.reps);
+      const value = estimate1RM(set.weightKg, set.reps);
       byWeek.set(key, Math.max(byWeek.get(key) ?? 0, value));
     }
     stalled.push({
@@ -1532,11 +1588,11 @@ export function buildOverview(data: Dataset, now: Date): OverviewModel {
   // Recent records: the newest session that beat the prior best, per exercise.
   const records: OverviewModel['records'] = [];
   for (const exercise of data.exercises) {
+    if (exercise.isBodyweight) continue;
     const sets = data.sets.filter((s) => s.exerciseId === exercise.id);
     const best = session1RM(sets);
     if (best === undefined) continue;
     const bestSet = effectiveSets(sets)
-      .filter((s) => s.weightKg > 0)
       .sort((a, b) => estimate1RM(b.weightKg, b.reps) - estimate1RM(a.weightKg, a.reps))[0];
     if (bestSet === undefined) continue;
     const days = Math.round((now.getTime() - bestSet.createdAt.getTime()) / DAY_MS);
@@ -1911,20 +1967,24 @@ export interface SessionsModel {
   detailFor(id: number): SessionDetail | undefined;
 }
 
-/** Bodyweight lifts compare on total load: a nominal 80 kg plus any added plates. */
-const BODYWEIGHT_KG = 80;
-
-function effectiveLoad(exercise: MockExercise, weightKg: number): number {
-  return exercise.isBodyweight ? BODYWEIGHT_KG + weightKg : weightKg;
+/**
+ * Ranking one set against another. Loaded lifts compare on estimated 1RM.
+ * Bodyweight lifts have no meaningful 1RM — the schema records no athlete
+ * weight, so any figure would be invented — and compare on added plates first,
+ * then reps.
+ */
+function isBetterSet(exercise: MockExercise, candidate: MockSet, current: MockSet): boolean {
+  if (exercise.isBodyweight) {
+    if (candidate.weightKg !== current.weightKg) return candidate.weightKg > current.weightKg;
+    return candidate.reps > current.reps;
+  }
+  return estimate1RM(candidate.weightKg, candidate.reps) > estimate1RM(current.weightKg, current.reps);
 }
 
 function topSetOf(exercise: MockExercise, sets: readonly MockSet[]): MockSet | undefined {
   let best: MockSet | undefined;
   for (const set of effectiveSets(sets)) {
-    if (best === undefined) { best = set; continue; }
-    const a = estimate1RM(effectiveLoad(exercise, set.weightKg) || 1, set.reps);
-    const b = estimate1RM(effectiveLoad(exercise, best.weightKg) || 1, best.reps);
-    if (a > b) best = set;
+    if (best === undefined || isBetterSet(exercise, set, best)) best = set;
   }
   return best;
 }
@@ -2009,8 +2069,10 @@ export function buildSessions(data: Dataset): SessionsModel {
       let color = 'color-mix(in srgb, var(--color-text) 55%, transparent)';
       if (top !== undefined && priorTop !== undefined) {
         liftsTotal++;
-        const now = effectiveLoad(exercise, top.weightKg);
-        const before = effectiveLoad(exercise, priorTop.weightKg);
+        // Same exercise on both sides, so raw weight compares correctly whether
+        // or not the lift is bodyweight.
+        const now = top.weightKg;
+        const before = priorTop.weightKg;
         if (now > before) {
           delta = formatDelta(top.weightKg - priorTop.weightKg, 'kg'); color = ACCENT_UP; liftsUp++;
         } else if (now === before && top.reps > priorTop.reps) {
@@ -2823,13 +2885,16 @@ export function buildExercise(data: Dataset, exerciseId: number): ExerciseModel 
   if (own.length === 0) return undefined;
 
   const working = effectiveSets(own);
-  const oneRM = (set: MockSet) => estimate1RM(set.weightKg > 0 ? set.weightKg : 1, set.reps);
 
-  // Best estimated 1RM per ISO week, chronological.
+  // Bodyweight lifts get no 1RM trend: the schema records no athlete weight, so
+  // any estimate would be invented. Their volume and set history still render.
+  const oneRM = (set: MockSet) => estimate1RM(set.weightKg, set.reps);
   const byWeek = new Map<string, number>();
-  for (const set of working) {
-    const key = isoWeekKey(set.createdAt, TIME_ZONE);
-    byWeek.set(key, Math.max(byWeek.get(key) ?? 0, oneRM(set)));
+  if (!exercise.isBodyweight) {
+    for (const set of working) {
+      const key = isoWeekKey(set.createdAt, TIME_ZONE);
+      byWeek.set(key, Math.max(byWeek.get(key) ?? 0, oneRM(set)));
+    }
   }
   let running = 0;
   const trend: ExercisePoint[] = [...byWeek.entries()]
@@ -2877,7 +2942,9 @@ export function buildExercise(data: Dataset, exerciseId: number): ExerciseModel 
 
   const restValues = deriveRestSeconds(own).filter((r): r is number => r !== undefined);
 
-  const bestSet = [...working].sort((a, b) => oneRM(b) - oneRM(a))[0];
+  const bestSet = exercise.isBodyweight
+    ? [...working].sort((a, b) => b.weightKg - a.weightKg || b.reps - a.reps)[0]
+    : [...working].sort((a, b) => oneRM(b) - oneRM(a))[0];
   const latestSet = [...working].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
   const latestWeek = trend[trend.length - 1];
 
@@ -2885,8 +2952,8 @@ export function buildExercise(data: Dataset, exerciseId: number): ExerciseModel 
     exerciseId,
     name: exercise.name,
     muscleLabel: MUSCLE_GROUP_LABELS[exercise.muscleGroup],
-    current1RM: `${formatKg(Math.round(latestWeek?.estimated1RM ?? 0))} kg`,
-    best1RM: `${formatKg(Math.round(running))} kg`,
+    current1RM: exercise.isBodyweight ? '—' : `${formatKg(Math.round(latestWeek?.estimated1RM ?? 0))} kg`,
+    best1RM: exercise.isBodyweight ? '—' : `${formatKg(Math.round(running))} kg`,
     totalSets: working.length,
     avgRestSeconds: restValues.length === 0
       ? 0
@@ -2938,7 +3005,13 @@ export function ExerciseDetail({ model }: { model: ExerciseModel }) {
             {model.trend.filter((p) => p.isRecord).length} récords
           </span>
         </div>
-        <AreaChart points={model.trend.map((p) => p.estimated1RM)} />
+        {model.trend.length < 2 ? (
+          <p className="text-muted" style={{ margin: 0, fontSize: 13 }}>
+            Sin estimación de 1RM: este ejercicio es de peso corporal y no registramos tu peso.
+          </p>
+        ) : (
+          <AreaChart points={model.trend.map((p) => p.estimated1RM)} />
+        )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
