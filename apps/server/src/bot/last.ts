@@ -3,12 +3,15 @@ import {
   type SetRow,
   getExerciseById,
   listCatalogAndOwn,
+  listExercisesByMuscleGroup,
   listHistorySetsForExercise,
 } from '@gym-tracker/db';
 import { type Bot, InlineKeyboard } from 'grammy';
 import type { DatabaseSync } from 'node:sqlite';
 import { matchExercise } from '../services/exercise-match';
+import { parseCallback } from './callback-data';
 import type { CustomContext } from './context';
+import { type PickerState, renderCandidates, renderNoMatch, renderPicker } from './exercise-picker';
 import { format1RM, formatSet } from './session-view';
 import { T } from './texts';
 
@@ -62,33 +65,65 @@ export function renderLast(
 }
 
 export function registerLast(bot: Bot<CustomContext>, db: DatabaseSync, config: { timezone: string }): void {
+  const groupsView = (userId: number) =>
+    renderPicker({ view: 'groups' }, 'l', listExercisesByMuscleGroup(db, userId));
+
   bot.command('last', async (ctx) => {
     const query = (ctx.match ?? '').toString().trim();
     if (!query) {
-      await ctx.reply(T.lastUsage);
+      // Sin argumentos: menú navegable en lugar del texto de ayuda.
+      const { text, keyboard } = groupsView(ctx.user.id);
+      await ctx.reply(text, { reply_markup: keyboard });
       return;
     }
     const pool = listCatalogAndOwn(db, ctx.user.id).map((e) => ({ id: e.id, name: e.name }));
     const match = matchExercise(query, pool);
     if (match.kind === 'none') {
-      await ctx.reply(T.noMatch(query));
+      const { text, keyboard } = renderNoMatch(query, 'l');
+      await ctx.reply(text, { reply_markup: keyboard });
       return;
     }
     if (match.kind === 'ambiguous') {
-      const kb = new InlineKeyboard();
-      for (const candidate of match.candidates.slice(0, 8)) {
-        kb.text(candidate.name, `last:${candidate.id}`).row();
-      }
-      await ctx.reply(T.lastAmbiguous, { reply_markup: kb });
+      const { text, keyboard } = renderCandidates(match.candidates, 'l');
+      await ctx.reply(text, { reply_markup: keyboard });
       return;
     }
     await ctx.reply(renderLast(db, { userId: ctx.user.id, exerciseId: match.exercise.id, timezone: config.timezone }));
   });
 
-  bot.callbackQuery(/^last:(\d+)$/, async (ctx) => {
+  // Solo el origen 'l': los pick:c: son de la captura y deben llegar al catch-all
+  // de capture.ts, que se registra después de este handler en bot.ts.
+  bot.callbackQuery(/^pick:l:/, async (ctx) => {
+    const action = parseCallback(ctx.callbackQuery.data ?? '');
+    const userId = ctx.user.id;
+
+    if (action.type === 'pick_search') {
+      await ctx.answerCallbackQuery(T.pickTypeName);
+      return;
+    }
+    if (action.type === 'pick_groups' || action.type === 'pick_group') {
+      const state: PickerState =
+        action.type === 'pick_groups'
+          ? { view: 'groups' }
+          : { view: 'group', groupIndex: action.groupIndex, offset: action.offset };
+      const { text, keyboard } = renderPicker(state, 'l', listExercisesByMuscleGroup(db, userId));
+      await ctx.editMessageText(text, { reply_markup: keyboard }).catch(() => {});
+      await ctx.answerCallbackQuery();
+      return;
+    }
+    if (action.type === 'pick_exercise') {
+      const exercise = getExerciseById(db, action.exerciseId);
+      if (!exercise || exercise.archived) {
+        await ctx.answerCallbackQuery(T.exerciseGoneToast);
+        const { text, keyboard } = groupsView(userId);
+        await ctx.editMessageText(text, { reply_markup: keyboard }).catch(() => {});
+        return;
+      }
+      const text = renderLast(db, { userId, exerciseId: action.exerciseId, timezone: config.timezone });
+      await ctx.editMessageText(text, { reply_markup: new InlineKeyboard() }).catch(() => {});
+      await ctx.answerCallbackQuery();
+      return;
+    }
     await ctx.answerCallbackQuery();
-    await ctx.reply(
-      renderLast(db, { userId: ctx.user.id, exerciseId: Number(ctx.match[1]), timezone: config.timezone }),
-    );
   });
 }
