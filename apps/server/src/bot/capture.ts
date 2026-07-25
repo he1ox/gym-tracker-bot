@@ -7,6 +7,7 @@ import {
   getSession,
   getWorkoutById,
   listCatalogAndOwn,
+  listExercisesByMuscleGroup,
   listRoutineDays,
   listRoutineExerciseDetails,
   updateSession,
@@ -26,6 +27,7 @@ import {
 } from '../services/session-service';
 import { parseCallback } from './callback-data';
 import type { CustomContext } from './context';
+import { type PickerState, renderCandidates, renderNoMatch, renderPicker } from './exercise-picker';
 import type { RestTimers } from './rest-timer';
 import { renderDayPicker, renderFinishSummary, renderSession } from './session-view';
 import { T, parseErrorText } from './texts';
@@ -73,12 +75,28 @@ export async function renderActive(
   await editOrSend(api, db, session, text, keyboard);
 }
 
-async function sendEphemeral(api: Api, db: DatabaseSync, session: BotSessionRow, text: string): Promise<void> {
+async function sendEphemeral(
+  api: Api,
+  db: DatabaseSync,
+  session: BotSessionRow,
+  text: string,
+  keyboard?: InlineKeyboard,
+): Promise<void> {
   if (session.ephemeralMessageId !== null) {
     await api.deleteMessage(session.chatId, session.ephemeralMessageId).catch(() => {});
   }
-  const sent = await api.sendMessage(session.chatId, text);
+  const sent = await api.sendMessage(session.chatId, text, keyboard ? { reply_markup: keyboard } : {});
   updateSession(db, session.userId, { ephemeralMessageId: sent.message_id }, Date.now());
+}
+
+async function showPicker(
+  api: Api,
+  db: DatabaseSync,
+  session: BotSessionRow,
+  state: PickerState,
+): Promise<void> {
+  const { text, keyboard } = renderPicker(state, 'c', listExercisesByMuscleGroup(db, session.userId));
+  await editOrSend(api, db, session, text, keyboard);
 }
 
 async function deletePreviousEphemeral(api: Api, session: BotSessionRow, messageId: number | null): Promise<void> {
@@ -101,14 +119,20 @@ function poolForMatching(db: DatabaseSync, session: BotSessionRow): Array<{ id: 
   return listCatalogAndOwn(db, session.userId).map((e) => ({ id: e.id, name: e.name }));
 }
 
-type Resolved = { id: number; name: string } | 'ambiguous' | 'none';
+type Resolved =
+  | { kind: 'unique'; id: number; name: string }
+  | { kind: 'ambiguous'; candidates: Array<{ id: number; name: string }> }
+  | { kind: 'none' };
 
 function resolveExerciseByName(db: DatabaseSync, session: BotSessionRow, query: string): Resolved {
   const result = matchExercise(query, poolForMatching(db, session));
   if (result.kind === 'unique') {
-    return { id: result.exercise.id, name: result.exercise.name };
+    return { kind: 'unique', id: result.exercise.id, name: result.exercise.name };
   }
-  return result.kind === 'ambiguous' ? 'ambiguous' : 'none';
+  if (result.kind === 'ambiguous') {
+    return { kind: 'ambiguous', candidates: result.candidates };
+  }
+  return { kind: 'none' };
 }
 
 async function doRecord(
@@ -245,12 +269,59 @@ async function handleCallback(ctx: CustomContext, db: DatabaseSync, restTimers: 
       updateSession(db, userId, { currentExerciseId: null }, now);
       break;
     case 'add': {
+      // "📂 Otro ejercicio" abre el menú de grupos en lugar de pedir que se escriba.
       updateSession(db, userId, { currentExerciseId: null }, now);
       const fresh = getSession(db, userId);
       if (fresh) {
-        await sendEphemeral(ctx.api, db, fresh, T.typeExerciseName);
-        await renderActive(ctx.api, db, getSession(db, userId) ?? fresh, restTimers);
+        await showPicker(ctx.api, db, fresh, { view: 'groups' });
       }
+      await ctx.answerCallbackQuery();
+      return;
+    }
+    case 'pick_groups': {
+      if (action.origin !== 'c') {
+        await ctx.answerCallbackQuery();
+        return;
+      }
+      await showPicker(ctx.api, db, session, { view: 'groups' });
+      await ctx.answerCallbackQuery();
+      return;
+    }
+    case 'pick_group': {
+      if (action.origin !== 'c') {
+        await ctx.answerCallbackQuery();
+        return;
+      }
+      await showPicker(ctx.api, db, session, {
+        view: 'group',
+        groupIndex: action.groupIndex,
+        offset: action.offset,
+      });
+      await ctx.answerCallbackQuery();
+      return;
+    }
+    case 'pick_exercise': {
+      if (action.origin !== 'c') {
+        await ctx.answerCallbackQuery();
+        return;
+      }
+      // El ejercicio pudo archivarse entre pintar el menú y pulsarlo: avisamos y
+      // repintamos en vez de fallar con un error de clave foránea.
+      const exercise = getExerciseById(db, action.exerciseId);
+      if (!exercise || exercise.archived) {
+        await ctx.answerCallbackQuery(T.exerciseGoneToast);
+        await showPicker(ctx.api, db, session, { view: 'groups' });
+        return;
+      }
+      switchExercise(db, { session, exerciseId: action.exerciseId, now });
+      break; // sigue al renderActive común del final
+    }
+    case 'pick_search': {
+      if (action.origin !== 'c') {
+        await ctx.answerCallbackQuery();
+        return;
+      }
+      await sendEphemeral(ctx.api, db, session, T.pickTypeName);
       await ctx.answerCallbackQuery();
       return;
     }
@@ -314,12 +385,14 @@ async function handleText(
     let current = session;
     if (parsed.value.exerciseName) {
       const matched = resolveExerciseByName(db, session, parsed.value.exerciseName);
-      if (matched === 'ambiguous') {
-        await sendEphemeral(ctx.api, db, session, T.ambiguousMatch);
+      if (matched.kind === 'ambiguous') {
+        const { text: candText, keyboard } = renderCandidates(matched.candidates, 'c');
+        await editOrSend(ctx.api, db, session, candText, keyboard);
         return;
       }
-      if (matched === 'none') {
-        await sendEphemeral(ctx.api, db, session, T.noMatch(parsed.value.exerciseName));
+      if (matched.kind === 'none') {
+        const { text: noneText, keyboard } = renderNoMatch(parsed.value.exerciseName, 'c');
+        await sendEphemeral(ctx.api, db, session, noneText, keyboard);
         return;
       }
       switchExercise(db, { session, exerciseId: matched.id, now: Date.now() });
@@ -341,12 +414,15 @@ async function handleText(
   // Texto sin serie válida: en estado "eligiendo ejercicio" se interpreta como búsqueda por nombre.
   if (session.currentExerciseId === null) {
     const matched = resolveExerciseByName(db, session, text);
-    if (matched === 'ambiguous') {
-      await sendEphemeral(ctx.api, db, session, T.ambiguousMatch);
+    if (matched.kind === 'ambiguous') {
+      const { text: candText, keyboard } = renderCandidates(matched.candidates, 'c');
+      await ctx.deleteMessage().catch(() => {}); // chat limpio
+      await editOrSend(ctx.api, db, session, candText, keyboard);
       return;
     }
-    if (matched === 'none') {
-      await sendEphemeral(ctx.api, db, session, T.noMatch(text));
+    if (matched.kind === 'none') {
+      const { text: noneText, keyboard } = renderNoMatch(text, 'c');
+      await sendEphemeral(ctx.api, db, session, noneText, keyboard);
       return;
     }
     switchExercise(db, { session, exerciseId: matched.id, now: Date.now() });
