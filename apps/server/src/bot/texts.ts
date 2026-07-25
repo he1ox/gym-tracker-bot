@@ -11,7 +11,6 @@ export const T = {
   // Selección de ejercicio (estado 2)
   chooseExercisePrompt: 'Elige un ejercicio:',
   otherExerciseButton: '📂 Otro ejercicio',
-  typeExerciseName: 'Escribe el nombre del ejercicio a añadir.',
 
   // En ejercicio (estado 3)
   headerIcon: '🏋️',
@@ -33,7 +32,6 @@ export const T = {
   genericError: 'Algo salió mal. Inténtalo de nuevo.',
   notAuthorized: 'No tienes acceso a este bot.',
   needWeightAndReps: 'Escribe el peso y las reps, p. ej. 60x8.',
-  ambiguousMatch: 'Varios ejercicios coinciden. Sé más específico.',
 
   header(dayName: string | null, effectiveSets: number, tonnageKg: string): string {
     const title = dayName ?? T.freeWorkoutTitle;
@@ -86,8 +84,6 @@ export const T = {
   },
 
   // /last command (Task 16)
-  lastUsage: 'Uso: /last <ejercicio>. Ej.: /last press banca.',
-  lastAmbiguous: '¿Cuál de estos?',
   lastNoHistory(name: string): string {
     return `Todavía no tienes series de ${name}.`;
   },
