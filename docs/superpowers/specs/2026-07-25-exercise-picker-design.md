@@ -104,10 +104,12 @@ nombre del ejercicio».
 **Pantalla de un grupo.** Los ejercicios del grupo, uno por fila, porque los nombres son
 largos (`Elevaciones laterales en polea`). Arriba, `‹ Volver` a los grupos.
 
-**Recorte a 10.** Con el catálogo actual el grupo más poblado es Pecho con 7 ejercicios, así
-que no se construye paginación completa: se muestran los 10 primeros y, si hay más, un botón
-`Ver más ▸` que avanza el `offset`. Decisión consciente de YAGNI; ampliarlo después es
-trivial.
+**Paginación de 10 en 10.** Con el catálogo actual el grupo más poblado es Pecho con 7
+ejercicios, de modo que la paginación casi nunca se activará; aun así es simétrica. Se
+muestran 10 ejercicios por página y, en una fila al pie, `‹ Anterior` y `Siguiente ›`,
+apareciendo solo el que aplica: `‹ Anterior` cuando `offset > 0` y `Siguiente ›` cuando
+quedan ejercicios por detrás. Ambos mueven el `offset` en pasos de 10. No se numeran las
+páginas.
 
 **Edición in place.** Toda la navegación edita el mismo mensaje, como ya hace la vista de
 sesión. Al elegir ejercicio, ese mensaje se convierte en la vista del ejercicio con sus
@@ -151,8 +153,11 @@ El estado de navegación viaja entero dentro del `callback_data`. No se persiste
 
 Tests puros, sin Telegram ni base de datos:
 
-- Render del picker: grupos vacíos ocultos, orden anatómico, dos columnas, recorte a 10 con
-  y sin `Ver más`, botón de volver presente solo en la vista de grupo.
+- Render del picker: grupos vacíos ocultos, orden anatómico, dos columnas, botón de volver
+  presente solo en la vista de grupo.
+- Paginación: con 10 o menos no aparece ninguna flecha; en la primera página de 25 solo
+  `Siguiente ›`; en la intermedia las dos; en la última solo `‹ Anterior`; un `offset` que
+  cae más allá del final se trata como fuera de rango.
 - `parseCallback`: cada variante de `pick:`, más índices fuera de rango, `offset` negativo y
   sufijos no numéricos.
 - `matchExercise` como tabla de casos: tildes, mayúsculas, términos desordenados, exacto
