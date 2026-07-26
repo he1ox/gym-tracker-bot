@@ -11,6 +11,9 @@ describe('parseSetInput — valid inputs', () => {
     ['32,5x10', { weightKg: 32.5, reps: 10 }],
     ['32.5x10', { weightKg: 32.5, reps: 10 }],
     ['100kg x 5', { weightKg: 100, reps: 5 }],
+    // El sufijo de unidad se ignora: nunca convierte, solo evita el error de formato.
+    ['100lb x 8', { weightKg: 100, reps: 8 }],
+    ['100lbs x 8', { weightKg: 100, reps: 8 }],
     ['60x8 rpe8', { weightKg: 60, reps: 8, rpe: 8 }],
     ['60x8 rpe 8.5', { weightKg: 60, reps: 8, rpe: 8.5 }],
     ['60x8 RPE8,5', { weightKg: 60, reps: 8, rpe: 8.5 }],

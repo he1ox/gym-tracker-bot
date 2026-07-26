@@ -1,6 +1,5 @@
 import { MUSCLE_GROUPS } from '@gym-tracker/core';
 
-export const WEIGHT_STEP = 2.5;
 export const REP_STEP = 1;
 
 // Origen del selector de ejercicios. Un solo carácter para no gastar los 64 bytes
@@ -45,7 +44,7 @@ export type CallbackAction =
   | { type: 'ex'; exerciseId: number }
   | { type: 'free' }
   | { type: 'rec' }
-  | { type: 'weight'; delta: number }
+  | { type: 'weight'; direction: 1 | -1 }
   | { type: 'reps'; delta: number }
   | { type: 'warmup' }
   | { type: 'list' }
@@ -119,9 +118,11 @@ export function parseCallback(data: string): CallbackAction {
     case CB.rec:
       return { type: 'rec' };
     case CB.wPlus:
-      return { type: 'weight', delta: WEIGHT_STEP };
+      // Solo la dirección: el incremento es una preferencia del usuario y este
+      // parser debe seguir siendo puro (sin leer el estado global de i18n).
+      return { type: 'weight', direction: 1 };
     case CB.wMinus:
-      return { type: 'weight', delta: -WEIGHT_STEP };
+      return { type: 'weight', direction: -1 };
     case CB.rPlus:
       return { type: 'reps', delta: REP_STEP };
     case CB.rMinus:

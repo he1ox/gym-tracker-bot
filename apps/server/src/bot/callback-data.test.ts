@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CB, parseCallback, WEIGHT_STEP } from './callback-data';
+import { CB, parseCallback } from './callback-data';
 import { MUSCLE_GROUPS } from '@gym-tracker/core';
 
 describe('callback-data', () => {
@@ -15,14 +15,20 @@ describe('callback-data', () => {
     expect(parseCallback(CB.ex(42))).toEqual({ type: 'ex', exerciseId: 42 });
     expect(parseCallback(CB.free)).toEqual({ type: 'free' });
     expect(parseCallback(CB.rec)).toEqual({ type: 'rec' });
-    expect(parseCallback(CB.wPlus)).toEqual({ type: 'weight', delta: WEIGHT_STEP });
-    expect(parseCallback(CB.wMinus)).toEqual({ type: 'weight', delta: -WEIGHT_STEP });
+    expect(parseCallback(CB.wPlus)).toEqual({ type: 'weight', direction: 1 });
+    expect(parseCallback(CB.wMinus)).toEqual({ type: 'weight', direction: -1 });
     expect(parseCallback(CB.rPlus)).toEqual({ type: 'reps', delta: 1 });
     expect(parseCallback(CB.rMinus)).toEqual({ type: 'reps', delta: -1 });
     expect(parseCallback(CB.warmup)).toEqual({ type: 'warmup' });
     expect(parseCallback(CB.list)).toEqual({ type: 'list' });
     expect(parseCallback(CB.add)).toEqual({ type: 'add' });
     expect(parseCallback(CB.restCancel)).toEqual({ type: 'rest_cancel' });
+  });
+
+  it('el ajuste de peso devuelve dirección, no incremento', () => {
+    // El incremento es una preferencia del usuario; este parser sigue siendo puro.
+    expect(parseCallback('w+')).toEqual({ type: 'weight', direction: 1 });
+    expect(parseCallback('w-')).toEqual({ type: 'weight', direction: -1 });
   });
 
   it('maps unknown or malformed data to { type: "unknown" }', () => {

@@ -86,6 +86,17 @@ describe('renderWelcome', () => {
     expect(widths.size).toBe(1);
   });
 
+  it('pinta la tabla con la unidad activa y sin descuadrar', () => {
+    setCurrent({ locale: 'es', unit: 'lb', step: 2.5 });
+    const { text } = renderWelcome({ firstName: 'George', overview: FULL });
+    expect(text).toContain('lb');
+    expect(text).not.toContain('kg');
+    const block = text.slice(text.indexOf('<pre>') + 5, text.indexOf('</pre>'));
+    const widths = new Set(block.split('\n').slice(0, 6).map((line) => line.length));
+    expect(widths.size).toBe(1); // todas las filas de la tabla miden lo mismo
+    setCurrent({ locale: 'es', unit: 'kg', step: 2.5 });
+  });
+
   it('shows every change as a dash for a user with no history and no exercise name', () => {
     const { text } = renderWelcome({ firstName: 'George', overview: EMPTY });
     const block = text.slice(text.indexOf('<pre>') + 5, text.indexOf('</pre>'));

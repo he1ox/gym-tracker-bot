@@ -12,6 +12,7 @@ import {
 } from '@gym-tracker/db';
 import { type Api, type Bot, GrammyError, InlineKeyboard } from 'grammy';
 import type { DatabaseSync } from 'node:sqlite';
+import { weightStep } from '../i18n/current';
 import { matchExercise } from '../services/exercise-match';
 import {
   adjustPending,
@@ -347,7 +348,7 @@ async function handleCallback(ctx: CustomContext, db: DatabaseSync, restTimers: 
       return;
     }
     case 'weight':
-      adjustPending(db, { session, weightDelta: action.delta, now });
+      adjustPending(db, { session, weightDelta: action.direction * weightStep(), now });
       break;
     case 'reps':
       adjustPending(db, { session, repsDelta: action.delta, now });

@@ -15,10 +15,12 @@ export type ParseErrorReason =
 
 export type ParseResult = { ok: true; value: ParsedSet } | { ok: false; reason: ParseErrorReason };
 
-// [nombre] peso [kg] x reps [rpe N] — siempre peso primero, tolerante a espacios,
-// mayúsculas y coma decimal. El nombre queda como texto crudo (matching en Fase 1).
+// [nombre] peso [kg|lb|lbs] x reps [rpe N] — siempre peso primero, tolerante a
+// espacios, mayúsculas y coma decimal. El sufijo de unidad se IGNORA: nunca
+// convierte (decisión del autor), solo evita que "100kg x 8" o "100lb x 8" se lean
+// como error de formato. El nombre queda como texto crudo (matching en Fase 1).
 const SET_PATTERN =
-  /^(?<name>.*?)\s*(?<weight>\d+(?:[.,]\d+)?)\s*(?:kg)?\s*[x×]\s*(?<reps>\d+)(?:\s*rpe\s*(?<rpe>\d+(?:[.,]\d+)?))?$/i;
+  /^(?<name>.*?)\s*(?<weight>\d+(?:[.,]\d+)?)\s*(?:kg|lbs?)?\s*[x×]\s*(?<reps>\d+)(?:\s*rpe\s*(?<rpe>\d+(?:[.,]\d+)?))?$/i;
 
 const toNumber = (raw: string): number => Number(raw.replace(',', '.'));
 

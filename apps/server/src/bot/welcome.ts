@@ -67,10 +67,18 @@ function metricsBlock(overview: Overview): string {
     metricRow(T.overviewWorkouts, formatTonnage(overview.workouts.current), overview.workouts.changePercent),
     metricRow(T.overviewSets, formatTonnage(overview.effectiveSets.current), overview.effectiveSets.changePercent),
     metricRow(T.overviewReps, formatTonnage(overview.reps.current), overview.reps.changePercent),
-    metricRow(T.overviewTonnage, `${formatTonnage(overview.tonnageKg.current)} kg`, overview.tonnageKg.changePercent),
+    metricRow(
+      T.overviewTonnage,
+      T.withUnit(formatTonnage(overview.tonnageKg.current)),
+      overview.tonnageKg.changePercent,
+    ),
     // formatWeight, NO formatTonnage: es el peso crudo de una serie y redondearlo
     // convertiría 62.5 kg en 63 kg, que es un dato falso.
-    metricRow(T.overviewHeaviest, `${formatWeight(overview.heaviest.current)} kg`, overview.heaviest.changePercent),
+    metricRow(
+      T.overviewHeaviest,
+      T.withUnit(formatWeight(overview.heaviest.current)),
+      overview.heaviest.changePercent,
+    ),
   ];
 
   if (overview.heaviest.exerciseName !== null) {
