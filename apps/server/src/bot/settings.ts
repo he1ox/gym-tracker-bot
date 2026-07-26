@@ -69,10 +69,12 @@ export function registerSettings(bot: Bot<CustomContext>, db: DatabaseSync): voi
   // así el cambio de idioma se ve al instante en la propia pantalla.
   const apply = async (ctx: CustomContext, patch: Partial<SettingsPrefs>): Promise<void> => {
     const next = { ...prefsOf(ctx), ...patch };
+    // El patch se arma clave a clave: con exactOptionalPropertyTypes, pasar
+    // `locale: undefined` no es lo mismo que omitir la clave.
     updateUserPreferences(db, ctx.user.id, {
-      locale: patch.locale,
-      weightUnit: patch.unit,
-      weightStep: patch.step,
+      ...(patch.locale === undefined ? {} : { locale: patch.locale }),
+      ...(patch.unit === undefined ? {} : { weightUnit: patch.unit }),
+      ...(patch.step === undefined ? {} : { weightStep: patch.step }),
     });
     setCurrent({ locale: next.locale, unit: next.unit, step: next.step });
     const { text, keyboard } = renderSettings(next);
