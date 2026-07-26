@@ -1,9 +1,9 @@
 import {
-  MUSCLE_GROUP_LABELS, detectStagnation, effectiveSets, estimate1RM, isoWeekKey,
+  MUSCLE_GROUP_LABELS, VOLUME_TARGET_MAX, detectStagnation, effectiveSets, estimate1RM, isoWeekKey,
   session1RM, sessionTonnage, weeklyVolumeByMuscleGroup,
 } from '@gym-tracker/core';
 import type { MuscleGroup } from '@gym-tracker/core';
-import { TIME_ZONE, VOLUME_TARGET_MAX } from '../config';
+import { TIME_ZONE } from '../config';
 import { muscleGroupMap } from '../data/mock';
 import type { Dataset, MockSet } from '../data/types';
 import type { HeatmapDay } from '../components/Heatmap';

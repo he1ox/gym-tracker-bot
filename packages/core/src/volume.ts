@@ -20,3 +20,12 @@ export function weeklyVolumeByMuscleGroup(
   }
   return counts;
 }
+
+/** Series efectivas por grupo muscular y semana que persigue el SPEC §8.1. */
+export const VOLUME_TARGET_MIN = 10;
+export const VOLUME_TARGET_MAX = 20;
+
+/** SPEC §8.1: la cuenta semanal de un grupo muscular debe caer en la banda 10-20. */
+export function isVolumeInBand(count: number): boolean {
+  return count >= VOLUME_TARGET_MIN && count <= VOLUME_TARGET_MAX;
+}

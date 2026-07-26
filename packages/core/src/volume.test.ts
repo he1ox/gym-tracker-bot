@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MuscleGroup } from './types';
-import { weeklyVolumeByMuscleGroup } from './volume';
+import { VOLUME_TARGET_MAX, VOLUME_TARGET_MIN, isVolumeInBand, weeklyVolumeByMuscleGroup } from './volume';
 
 const groups: ReadonlyMap<number, MuscleGroup> = new Map([
   [1, 'chest'],
@@ -50,5 +50,28 @@ describe('weeklyVolumeByMuscleGroup', () => {
         timeZone: 'UTC',
       }),
     ).toThrow(/99/);
+  });
+});
+
+describe('banda de volumen (SPEC §8.1)', () => {
+  it('describe la banda 10-20', () => {
+    expect(VOLUME_TARGET_MIN).toBe(10);
+    expect(VOLUME_TARGET_MAX).toBe(20);
+  });
+
+  it('deja fuera una cuenta por debajo de la banda', () => {
+    expect(isVolumeInBand(9)).toBe(false);
+  });
+
+  it('incluye el límite inferior', () => {
+    expect(isVolumeInBand(10)).toBe(true);
+  });
+
+  it('incluye el límite superior', () => {
+    expect(isVolumeInBand(20)).toBe(true);
+  });
+
+  it('deja fuera una cuenta por encima de la banda', () => {
+    expect(isVolumeInBand(21)).toBe(false);
   });
 });

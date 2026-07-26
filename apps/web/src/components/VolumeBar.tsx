@@ -1,6 +1,5 @@
-import { VOLUME_TARGET_MAX, VOLUME_TARGET_MIN } from '../config';
+import { VOLUME_TARGET_MAX, VOLUME_TARGET_MIN, isVolumeInBand } from '@gym-tracker/core';
 import { ACCENT_DOWN } from '../presenters/format';
-import { isVolumeInBand } from '../presenters/volume';
 
 export function VolumeBar({ label, count, max }: { label: string; count: number; max: number }) {
   const inBand = isVolumeInBand(count);
