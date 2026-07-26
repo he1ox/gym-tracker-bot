@@ -11,7 +11,8 @@
     "@grammyjs/conversations": "^2.1.1",
     "@gym-tracker/core": "workspace:*",
     "@gym-tracker/db": "workspace:*",
-    "grammy": "^1.45.1"
+    "grammy": "^1.45.1",
+    "i18next": "^26.3.6"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
