@@ -2,6 +2,7 @@ export * from './types';
 export * from './effective-sets';
 export * from './weeks';
 export * from './local-day';
+export * from './overview';
 export * from './tonnage';
 export * from './one-rep-max';
 export * from './records';
