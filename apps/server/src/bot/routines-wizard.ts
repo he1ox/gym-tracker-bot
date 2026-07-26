@@ -1,4 +1,4 @@
-import { MUSCLE_GROUPS, MUSCLE_GROUP_LABELS, type MuscleGroup } from '@gym-tracker/core';
+import { MUSCLE_GROUPS, type MuscleGroup } from '@gym-tracker/core';
 import {
   addRoutineExercise,
   createCustomExercise,
@@ -13,6 +13,7 @@ import {
 import { type Conversation, conversations, createConversation } from '@grammyjs/conversations';
 import { type Bot, type Context, InlineKeyboard } from 'grammy';
 import type { DatabaseSync } from 'node:sqlite';
+import { groupLabel, localizeGroups } from '../i18n/exercise-name';
 import { matchExercise } from '../services/exercise-match';
 import { CB, parseCallback } from './callback-data';
 import type { CustomContext } from './context';
@@ -125,7 +126,7 @@ async function pickExerciseByGroup(
   let toDelete = priorMenuMessageId;
   for (;;) {
     const view = await conversation.external(() =>
-      renderPicker(state, 'c', listExercisesByMuscleGroup(db, userId)),
+      renderPicker(state, 'c', localizeGroups(listExercisesByMuscleGroup(db, userId))),
     );
     await deleteMenuMessage(ctx, toDelete);
     const sent = await ctx.reply(view.text, { reply_markup: view.keyboard });
@@ -185,7 +186,7 @@ async function addExercisesToDay(
     } else if (resp.message?.text) {
       const query = resp.message.text.trim();
       const pool = await conversation.external(() =>
-        listCatalogAndOwn(db, userId).map((e) => ({ id: e.id, name: e.name })),
+        listCatalogAndOwn(db, userId).map((e) => ({ id: e.id, name: e.name, nameKey: e.nameKey })),
       );
       const match = matchExercise(query, pool);
       if (match.kind === 'none') {
@@ -276,7 +277,7 @@ async function createOwnExercise(
 
   const kb = new InlineKeyboard();
   MUSCLE_GROUPS.forEach((group, index) => {
-    kb.text(MUSCLE_GROUP_LABELS[group], `wizard:mg:${group}`);
+    kb.text(groupLabel(group), `wizard:mg:${group}`);
     if (index % 2 === 1) {
       kb.row();
     }

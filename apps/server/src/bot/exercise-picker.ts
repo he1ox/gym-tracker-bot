@@ -1,4 +1,5 @@
-import { MUSCLE_GROUPS, MUSCLE_GROUP_LABELS, type MuscleGroup } from '@gym-tracker/core';
+import { MUSCLE_GROUPS, type MuscleGroup } from '@gym-tracker/core';
+import { groupLabel } from '../i18n/exercise-name';
 import type { ExerciseOption } from '@gym-tracker/db';
 import { InlineKeyboard } from 'grammy';
 import { CB, type PickOrigin } from './callback-data';
@@ -33,7 +34,7 @@ function renderGroups(
     if (column > 0 && column % 2 === 0) {
       keyboard.row(); // dos columnas
     }
-    keyboard.text(MUSCLE_GROUP_LABELS[group], CB.pickGroup(origin, index, 0));
+    keyboard.text(groupLabel(group), CB.pickGroup(origin, index, 0));
     column += 1;
   });
   if (column > 0) {
@@ -79,7 +80,7 @@ export function renderPicker(
       keyboard.text(T.pickNextButton, CB.pickGroup(origin, state.groupIndex, state.offset + PICKER_PAGE_SIZE));
     }
   }
-  return { text: T.pickGroupTitle(MUSCLE_GROUP_LABELS[group]), keyboard };
+  return { text: T.pickGroupTitle(groupLabel(group)), keyboard };
 }
 
 export function renderCandidates(candidates: readonly ExerciseOption[], origin: PickOrigin): Rendered {

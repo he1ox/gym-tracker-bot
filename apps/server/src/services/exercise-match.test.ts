@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { setCurrent } from '../i18n/current';
+import { initI18n } from '../i18n/index';
 import { matchExercise } from './exercise-match';
 
 const gym = [
@@ -84,5 +86,15 @@ describe('matchExercise — accents and multi-term queries', () => {
 
   it('collapses runs of whitespace between terms', () => {
     expect(matchExercise('  polea   triceps  ', accented)).toEqual({ kind: 'unique', exercise: accented[1] });
+  });
+
+  it('encuentra por el nombre traducido y por el original', () => {
+    initI18n();
+    setCurrent({ locale: 'en', unit: 'kg', step: 2.5 });
+    const pool = [{ id: 1, name: 'Sentadilla con barra', nameKey: 'squat_barbell' }];
+    expect(matchExercise('squat', pool)).toEqual({ kind: 'unique', exercise: pool[0] });
+    // El usuario que lleva meses escribiendo "sentadilla" no debe perder el atajo.
+    expect(matchExercise('sentadilla', pool)).toEqual({ kind: 'unique', exercise: pool[0] });
+    setCurrent({ locale: 'es', unit: 'kg', step: 2.5 });
   });
 });

@@ -20,6 +20,7 @@ import {
   nextSetPosition,
   updateSession,
 } from '@gym-tracker/db';
+import { displayName } from '../i18n/exercise-name';
 import type { DatabaseSync } from 'node:sqlite';
 import type {
   DayOption,
@@ -167,7 +168,11 @@ function buildPickItems(db: DatabaseSync, session: BotSessionRow): ExercisePickI
   const seen = new Set<number>();
   if (workout && workout.routineDayId !== null) {
     for (const detail of listRoutineExerciseDetails(db, workout.routineDayId)) {
-      items.push({ exerciseId: detail.exerciseId, name: detail.name, done: effectiveToday.has(detail.exerciseId) });
+      items.push({
+        exerciseId: detail.exerciseId,
+        name: displayName(detail),
+        done: effectiveToday.has(detail.exerciseId),
+      });
       seen.add(detail.exerciseId);
     }
   }
@@ -175,7 +180,7 @@ function buildPickItems(db: DatabaseSync, session: BotSessionRow): ExercisePickI
     if (!seen.has(exerciseId)) {
       const exercise = getExerciseById(db, exerciseId);
       if (exercise) {
-        items.push({ exerciseId, name: exercise.name, done: true });
+        items.push({ exerciseId, name: displayName(exercise), done: true });
       }
     }
   }
@@ -226,7 +231,7 @@ export function buildSessionView(db: DatabaseSync, session: BotSessionRow): Sess
   return {
     kind: 'in_exercise',
     header,
-    exerciseName: exercise?.name ?? '',
+    exerciseName: exercise ? displayName(exercise) : '',
     lastTime,
     today,
     pending,
@@ -248,7 +253,11 @@ export function finishWorkout(db: DatabaseSync, params: { session: BotSessionRow
     const pr = detectPersonalRecord(history, sessionSets);
     if (pr) {
       const exercise = getExerciseById(db, exerciseId);
-      records.push({ exerciseName: exercise?.name ?? '', estimated1RM: pr.estimated1RM, previous1RM: pr.previous1RM ?? null });
+      records.push({
+        exerciseName: exercise ? displayName(exercise) : '',
+        estimated1RM: pr.estimated1RM,
+        previous1RM: pr.previous1RM ?? null,
+      });
     }
   }
 

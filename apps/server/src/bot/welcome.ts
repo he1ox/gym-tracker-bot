@@ -3,6 +3,7 @@ import { listExercisesByMuscleGroup } from '@gym-tracker/db';
 import { type Api, type Bot, InlineKeyboard } from 'grammy';
 import type { DatabaseSync } from 'node:sqlite';
 import { buildUserOverview } from '../services/overview-service';
+import { localizeGroups } from '../i18n/exercise-name';
 import { buildDayOptions } from '../services/session-service';
 import { CB } from './callback-data';
 import type { CustomContext } from './context';
@@ -180,7 +181,7 @@ export function registerWelcome(
 
   bot.callbackQuery(CB.wcHistory, async (ctx) => {
     // Origen 'l': sus callbacks los atiende last.ts:96, registrado antes que esto.
-    const picker = renderPicker({ view: 'groups' }, 'l', listExercisesByMuscleGroup(db, ctx.user.id));
+    const picker = renderPicker({ view: 'groups' }, 'l', localizeGroups(listExercisesByMuscleGroup(db, ctx.user.id)));
     await edit(ctx, picker, false);
     await ctx.answerCallbackQuery();
   });

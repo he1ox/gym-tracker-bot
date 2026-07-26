@@ -23,6 +23,7 @@ export interface RoutineExerciseDetail {
   exerciseId: number;
   position: number;
   name: string;
+  nameKey: string | null;
   muscleGroup: MuscleGroup;
   targetSets: number | null;
   targetRepsMin: number | null;
@@ -146,6 +147,7 @@ interface RoutineExerciseDetailDb {
   exercise_id: number;
   position: number;
   name: string;
+  name_key: string | null;
   muscle_group: MuscleGroup;
   target_sets: number | null;
   target_reps_min: number | null;
@@ -157,7 +159,7 @@ export function listRoutineExerciseDetails(db: DatabaseSync, routineDayId: numbe
   const rows = db
     .prepare(
       `SELECT re.id, re.routine_day_id, re.exercise_id, re.position,
-              e.name, e.muscle_group,
+              e.name, e.name_key, e.muscle_group,
               re.target_sets, re.target_reps_min, re.target_reps_max, re.target_rest_seconds
          FROM routine_exercises re
          JOIN exercises e ON e.id = re.exercise_id
@@ -171,6 +173,7 @@ export function listRoutineExerciseDetails(db: DatabaseSync, routineDayId: numbe
     exerciseId: r.exercise_id,
     position: r.position,
     name: r.name,
+    nameKey: r.name_key,
     muscleGroup: r.muscle_group,
     targetSets: r.target_sets,
     targetRepsMin: r.target_reps_min,

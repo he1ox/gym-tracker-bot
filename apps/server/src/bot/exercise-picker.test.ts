@@ -1,8 +1,9 @@
-import { MUSCLE_GROUPS, MUSCLE_GROUP_LABELS, type MuscleGroup } from '@gym-tracker/core';
+import { MUSCLE_GROUPS, type MuscleGroup } from '@gym-tracker/core';
 import type { ExerciseOption } from '@gym-tracker/db';
 import type { InlineKeyboard } from 'grammy';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { setCurrent } from '../i18n/current';
+import { groupLabel } from '../i18n/exercise-name';
 import { initI18n } from '../i18n/index';
 import { CB } from './callback-data';
 import { PICKER_PAGE_SIZE, renderCandidates, renderNoMatch, renderPicker } from './exercise-picker';
@@ -26,7 +27,7 @@ function rows(kb: InlineKeyboard): string[][] {
 }
 
 const options = (n: number, from = 1): ExerciseOption[] =>
-  Array.from({ length: n }, (_, i) => ({ id: from + i, name: `Ejercicio ${from + i}` }));
+  Array.from({ length: n }, (_, i) => ({ id: from + i, name: `Ejercicio ${from + i}`, nameKey: null }));
 
 const CHEST = MUSCLE_GROUPS.indexOf('chest');
 const BICEPS = MUSCLE_GROUPS.indexOf('biceps');
@@ -41,7 +42,7 @@ describe('renderPicker — groups view', () => {
     const { text, keyboard } = renderPicker({ view: 'groups' }, 'c', twoGroups);
     expect(text).toBe(T.pickChooseGroup);
     expect(rows(keyboard)).toEqual([
-      [MUSCLE_GROUP_LABELS.chest, MUSCLE_GROUP_LABELS.biceps],
+      [groupLabel('chest'), groupLabel('biceps')],
       [T.pickSearchButton],
     ]);
     expect(datas(keyboard)).toEqual([
@@ -58,8 +59,8 @@ describe('renderPicker — groups view', () => {
       ['abs', options(1, 60)],
     ]);
     expect(rows(renderPicker({ view: 'groups' }, 'c', three).keyboard)).toEqual([
-      [MUSCLE_GROUP_LABELS.chest, MUSCLE_GROUP_LABELS.biceps],
-      [MUSCLE_GROUP_LABELS.abs],
+      [groupLabel('chest'), groupLabel('biceps')],
+      [groupLabel('abs')],
       [T.pickSearchButton],
     ]);
   });
@@ -84,7 +85,7 @@ describe('renderPicker — groups view', () => {
 describe('renderPicker — group view', () => {
   it('lists the exercises one per row, under a back button', () => {
     const { text, keyboard } = renderPicker({ view: 'group', groupIndex: CHEST, offset: 0 }, 'c', twoGroups);
-    expect(text).toBe(T.pickGroupTitle(MUSCLE_GROUP_LABELS.chest));
+    expect(text).toBe(T.pickGroupTitle(groupLabel('chest')));
     expect(rows(keyboard)).toEqual([
       [T.pickBackButton],
       ['Ejercicio 1'],

@@ -8,6 +8,7 @@ import {
 } from '@gym-tracker/db';
 import { type Bot, InlineKeyboard } from 'grammy';
 import type { DatabaseSync } from 'node:sqlite';
+import { displayName, localizeGroups } from '../i18n/exercise-name';
 import { matchExercise } from '../services/exercise-match';
 import { parseCallback } from './callback-data';
 import type { CustomContext } from './context';
@@ -26,7 +27,7 @@ export function renderLast(
   params: { userId: number; exerciseId: number; timezone: string },
 ): string {
   const exercise = getExerciseById(db, params.exerciseId);
-  const name = exercise?.name ?? '';
+  const name = exercise ? displayName(exercise) : '';
   // excludeWorkoutId: 0 no excluye ninguno (ningún workout tiene id 0) → todo el histórico.
   const sets = listHistorySetsForExercise(db, {
     userId: params.userId,
@@ -66,7 +67,7 @@ export function renderLast(
 
 export function registerLast(bot: Bot<CustomContext>, db: DatabaseSync, config: { timezone: string }): void {
   const groupsView = (userId: number) =>
-    renderPicker({ view: 'groups' }, 'l', listExercisesByMuscleGroup(db, userId));
+    renderPicker({ view: 'groups' }, 'l', localizeGroups(listExercisesByMuscleGroup(db, userId)));
 
   bot.command('last', async (ctx) => {
     const query = (ctx.match ?? '').toString().trim();
@@ -76,7 +77,7 @@ export function registerLast(bot: Bot<CustomContext>, db: DatabaseSync, config: 
       await ctx.reply(text, { reply_markup: keyboard });
       return;
     }
-    const pool = listCatalogAndOwn(db, ctx.user.id).map((e) => ({ id: e.id, name: e.name }));
+    const pool = listCatalogAndOwn(db, ctx.user.id).map((e) => ({ id: e.id, name: e.name, nameKey: e.nameKey }));
     const match = matchExercise(query, pool);
     if (match.kind === 'none') {
       const { text, keyboard } = renderNoMatch(query, 'l');
@@ -110,7 +111,7 @@ export function registerLast(bot: Bot<CustomContext>, db: DatabaseSync, config: 
         action.type === 'pick_groups'
           ? { view: 'groups' }
           : { view: 'group', groupIndex: action.groupIndex, offset: action.offset };
-      const { text, keyboard } = renderPicker(state, 'l', listExercisesByMuscleGroup(db, userId));
+      const { text, keyboard } = renderPicker(state, 'l', localizeGroups(listExercisesByMuscleGroup(db, userId)));
       await ctx.editMessageText(text, { reply_markup: keyboard }).catch(() => {});
       await ctx.answerCallbackQuery();
       return;

@@ -13,6 +13,7 @@ import {
 import { type Api, type Bot, GrammyError, InlineKeyboard } from 'grammy';
 import type { DatabaseSync } from 'node:sqlite';
 import { weightStep } from '../i18n/current';
+import { displayName, localizeGroups } from '../i18n/exercise-name';
 import { matchExercise } from '../services/exercise-match';
 import {
   adjustPending,
@@ -95,7 +96,7 @@ async function showPicker(
   session: BotSessionRow,
   state: PickerState,
 ): Promise<void> {
-  const { text, keyboard } = renderPicker(state, 'c', listExercisesByMuscleGroup(db, session.userId));
+  const { text, keyboard } = renderPicker(state, 'c', localizeGroups(listExercisesByMuscleGroup(db, session.userId)));
   await editOrSend(api, db, session, text, keyboard);
 }
 
@@ -105,29 +106,37 @@ async function deletePreviousEphemeral(api: Api, session: BotSessionRow, message
   }
 }
 
-function poolForMatching(db: DatabaseSync, session: BotSessionRow): Array<{ id: number; name: string }> {
+function poolForMatching(
+  db: DatabaseSync,
+  session: BotSessionRow,
+): Array<{ id: number; name: string; nameKey: string | null }> {
   if (session.currentExerciseId === null) {
-    return listCatalogAndOwn(db, session.userId).map((e) => ({ id: e.id, name: e.name }));
+    return listCatalogAndOwn(db, session.userId).map((e) => ({ id: e.id, name: e.name, nameKey: e.nameKey }));
   }
   const workout = getWorkoutById(db, session.workoutId);
   if (workout && workout.routineDayId !== null) {
-    const day = listRoutineExerciseDetails(db, workout.routineDayId).map((d) => ({ id: d.exerciseId, name: d.name }));
+    const day = listRoutineExerciseDetails(db, workout.routineDayId).map((d) => ({
+      id: d.exerciseId,
+      name: d.name,
+      nameKey: d.nameKey,
+    }));
     if (day.length > 0) {
       return day;
     }
   }
-  return listCatalogAndOwn(db, session.userId).map((e) => ({ id: e.id, name: e.name }));
+  return listCatalogAndOwn(db, session.userId).map((e) => ({ id: e.id, name: e.name, nameKey: e.nameKey }));
 }
 
 type Resolved =
   | { kind: 'unique'; id: number; name: string }
-  | { kind: 'ambiguous'; candidates: Array<{ id: number; name: string }> }
+  | { kind: 'ambiguous'; candidates: Array<{ id: number; name: string; nameKey: string | null }> }
   | { kind: 'none' };
 
 function resolveExerciseByName(db: DatabaseSync, session: BotSessionRow, query: string): Resolved {
   const result = matchExercise(query, poolForMatching(db, session));
   if (result.kind === 'unique') {
-    return { kind: 'unique', id: result.exercise.id, name: result.exercise.name };
+    // El nombre ya mostrado: el resto del flujo lo pinta tal cual.
+    return { kind: 'unique', id: result.exercise.id, name: displayName(result.exercise) };
   }
   if (result.kind === 'ambiguous') {
     return { kind: 'ambiguous', candidates: result.candidates };
