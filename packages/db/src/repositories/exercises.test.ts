@@ -12,7 +12,7 @@ import {
 function seededDb() {
   const d = openDatabase(':memory:');
   runMigrations(d, MIGRATIONS_DIR);
-  createUser(d, { telegramUserId: 1, timezone: 'UTC', createdAt: 0 });
+  createUser(d, { telegramUserId: 1, timezone: 'UTC', locale: 'es', createdAt: 0 });
   return d;
 }
 
@@ -36,7 +36,7 @@ describe('exercises repository', () => {
 
   it('lists catalog + own exercises, excluding other users and archived', () => {
     const d = seededDb();
-    createUser(d, { telegramUserId: 2, timezone: 'UTC', createdAt: 0 });
+    createUser(d, { telegramUserId: 2, timezone: 'UTC', locale: 'es', createdAt: 0 });
     const mine = createCustomExercise(d, { userId: 1, name: 'Mi ejercicio', muscleGroup: 'abs' });
     createCustomExercise(d, { userId: 2, name: 'Ajeno', muscleGroup: 'abs' });
     d.prepare('UPDATE exercises SET archived = 1 WHERE id = ?').run(mine.id);
@@ -83,7 +83,7 @@ describe('listExercisesByMuscleGroup', () => {
 
   it('includes own exercises, excludes archived ones and other users', () => {
     const d = seededDb();
-    createUser(d, { telegramUserId: 2, timezone: 'UTC', createdAt: 0 });
+    createUser(d, { telegramUserId: 2, timezone: 'UTC', locale: 'es', createdAt: 0 });
     const mine = createCustomExercise(d, { userId: 1, name: 'Mi curl', muscleGroup: 'biceps' });
     const archived = createCustomExercise(d, { userId: 1, name: 'Curl viejo', muscleGroup: 'biceps' });
     createCustomExercise(d, { userId: 2, name: 'Curl ajeno', muscleGroup: 'biceps' });

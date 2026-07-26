@@ -15,7 +15,7 @@ import {
 function db() {
   const d = openDatabase(':memory:');
   runMigrations(d, MIGRATIONS_DIR);
-  createUser(d, { telegramUserId: 1, timezone: 'UTC', createdAt: 0 });
+  createUser(d, { telegramUserId: 1, timezone: 'UTC', locale: 'es', createdAt: 0 });
   return d;
 }
 

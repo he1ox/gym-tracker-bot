@@ -98,6 +98,29 @@ describe('runMigrations', () => {
     expect(pk?.name).toBe('user_id');
   });
 
+  it('0002 asigna name_key a las 51 filas del catálogo y a ninguna propia', () => {
+    const db = migratedDb();
+    const withKey = db
+      .prepare('SELECT COUNT(*) AS n FROM exercises WHERE user_id IS NULL AND name_key IS NOT NULL')
+      .get() as { n: number };
+    const withoutKey = db
+      .prepare('SELECT COUNT(*) AS n FROM exercises WHERE user_id IS NULL AND name_key IS NULL')
+      .get() as { n: number };
+    expect(withKey.n).toBe(51);
+    expect(withoutKey.n).toBe(0);
+    db.close();
+  });
+
+  it('0002 deja los defaults de preferencias en la tabla users recreada', () => {
+    const db = migratedDb();
+    db.prepare('INSERT INTO users (telegram_user_id, timezone, created_at) VALUES (1, ?, 0)').run('UTC');
+    const row = db
+      .prepare('SELECT locale, weight_unit, weight_step FROM users WHERE telegram_user_id = 1')
+      .get();
+    expect(row).toEqual({ locale: 'en', weight_unit: 'kg', weight_step: 2.5 });
+    db.close();
+  });
+
   it('enforces the bot_sessions foreign keys', () => {
     const db = migratedDb();
     const insert = db.prepare(

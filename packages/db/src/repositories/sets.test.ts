@@ -18,7 +18,7 @@ const EX = 1; // ejercicio 1 del catálogo seed
 function db() {
   const d = openDatabase(':memory:');
   runMigrations(d, MIGRATIONS_DIR);
-  createUser(d, { telegramUserId: 1, timezone: 'UTC', createdAt: 0 });
+  createUser(d, { telegramUserId: 1, timezone: 'UTC', locale: 'es', createdAt: 0 });
   return d;
 }
 
@@ -102,7 +102,7 @@ describe('listEffectiveSetsBetween', () => {
 
   it('isolates by user_id', () => {
     const d = db();
-    createUser(d, { telegramUserId: 2, timezone: 'UTC', createdAt: 0 });
+    createUser(d, { telegramUserId: 2, timezone: 'UTC', locale: 'es', createdAt: 0 });
     const mine = createWorkout(d, { userId: 1, routineDayId: null, dayNameSnapshot: null, startedAt: 0 });
     const theirs = createWorkout(d, { userId: 2, routineDayId: null, dayNameSnapshot: null, startedAt: 0 });
     add(d, mine.id, { createdAt: 1000, weightKg: 60 });

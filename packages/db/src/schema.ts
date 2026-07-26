@@ -4,12 +4,27 @@ import { check, index, integer, real, sqliteTable, text } from 'drizzle-orm/sqli
 
 const muscleGroupList = MUSCLE_GROUPS.map((group) => `'${group}'`).join(', ');
 
-export const users = sqliteTable('users', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  telegramUserId: integer('telegram_user_id').notNull().unique(),
-  timezone: text('timezone').notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-});
+export const users = sqliteTable(
+  'users',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    telegramUserId: integer('telegram_user_id').notNull().unique(),
+    timezone: text('timezone').notNull(),
+    // Preferencias de presentación. 'en' es el idioma de reserva: es lo que ve
+    // quien llega con un language_code desconocido o ausente.
+    locale: text('locale', { enum: ['es', 'en'] }).notNull().default('en'),
+    // OJO: la unidad es SOLO una etiqueta. Cambiarla no convierte ningún peso ya
+    // guardado (decisión del autor), así que el histórico puede mezclar unidades.
+    weightUnit: text('weight_unit', { enum: ['kg', 'lb'] }).notNull().default('kg'),
+    weightStep: real('weight_step').notNull().default(2.5),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  () => [
+    check('users_locale_check', sql.raw("locale IN ('es', 'en')")),
+    check('users_weight_unit_check', sql.raw("weight_unit IN ('kg', 'lb')")),
+    check('users_weight_step_check', sql.raw('weight_step IN (1, 2.5, 5, 10)')),
+  ],
+);
 
 export const exercises = sqliteTable(
   'exercises',
@@ -20,6 +35,9 @@ export const exercises = sqliteTable(
     muscleGroup: text('muscle_group', { enum: MUSCLE_GROUPS }).notNull(),
     isCustom: integer('is_custom', { mode: 'boolean' }).notNull().default(false),
     archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
+    // Clave de traducción del catálogo base (i18n del bot). NULL en los ejercicios
+    // que crea el usuario: esos se muestran con su `name` literal en cualquier idioma.
+    nameKey: text('name_key'),
   },
   (table) => [check('exercises_muscle_group_check', sql.raw(`muscle_group IN (${muscleGroupList})`))],
 );

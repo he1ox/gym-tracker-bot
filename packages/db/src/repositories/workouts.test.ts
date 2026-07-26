@@ -12,7 +12,7 @@ import {
 function db() {
   const d = openDatabase(':memory:');
   runMigrations(d, MIGRATIONS_DIR);
-  createUser(d, { telegramUserId: 1, timezone: 'UTC', createdAt: 0 });
+  createUser(d, { telegramUserId: 1, timezone: 'UTC', locale: 'es', createdAt: 0 });
   return d;
 }
 
@@ -51,7 +51,7 @@ describe('listWorkoutStartsBetween', () => {
 
   it('isolates by user_id', () => {
     const d = db();
-    createUser(d, { telegramUserId: 2, timezone: 'UTC', createdAt: 0 });
+    createUser(d, { telegramUserId: 2, timezone: 'UTC', locale: 'es', createdAt: 0 });
     createWorkout(d, { userId: 1, routineDayId: null, dayNameSnapshot: null, startedAt: 1000 });
     createWorkout(d, { userId: 2, routineDayId: null, dayNameSnapshot: null, startedAt: 1000 });
     expect(listWorkoutStartsBetween(d, { userId: 1, fromMs: 0, toMs: 9999 })).toHaveLength(1);

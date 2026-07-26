@@ -7,7 +7,7 @@ import { createSession, deleteSession, getSession, updateSession } from './bot-s
 function seeded() {
   const d = openDatabase(':memory:');
   runMigrations(d, MIGRATIONS_DIR);
-  createUser(d, { telegramUserId: 1, timezone: 'UTC', createdAt: 0 });
+  createUser(d, { telegramUserId: 1, timezone: 'UTC', locale: 'es', createdAt: 0 });
   const w = createWorkout(d, { userId: 1, routineDayId: null, dayNameSnapshot: null, startedAt: 0 });
   return { d, workoutId: w.id };
 }

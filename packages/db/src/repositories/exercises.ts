@@ -8,6 +8,7 @@ export interface ExerciseRow {
   muscleGroup: MuscleGroup;
   isCustom: boolean;
   archived: boolean;
+  nameKey: string | null;
 }
 
 interface ExerciseRowDb {
@@ -17,6 +18,7 @@ interface ExerciseRowDb {
   muscle_group: MuscleGroup;
   is_custom: number;
   archived: number;
+  name_key: string | null;
 }
 
 const mapExercise = (r: ExerciseRowDb): ExerciseRow => ({
@@ -26,9 +28,11 @@ const mapExercise = (r: ExerciseRowDb): ExerciseRow => ({
   muscleGroup: r.muscle_group,
   isCustom: Boolean(r.is_custom),
   archived: Boolean(r.archived),
+  nameKey: r.name_key,
 });
 
-const SELECT = 'SELECT id, user_id, name, muscle_group, is_custom, archived FROM exercises';
+const SELECT =
+  'SELECT id, user_id, name, muscle_group, is_custom, archived, name_key FROM exercises';
 
 export function getExerciseById(db: DatabaseSync, id: number): ExerciseRow | undefined {
   const row = db.prepare(`${SELECT} WHERE id = ?`).get(id) as ExerciseRowDb | undefined;
@@ -49,6 +53,7 @@ export function createCustomExercise(
     muscleGroup: params.muscleGroup,
     isCustom: true,
     archived: false,
+    nameKey: null,
   };
 }
 
@@ -64,6 +69,7 @@ export function listCatalogAndOwn(db: DatabaseSync, userId: number): ExerciseRow
 export interface ExerciseOption {
   id: number;
   name: string;
+  nameKey: string | null;
 }
 
 /**
@@ -77,19 +83,24 @@ export function listExercisesByMuscleGroup(
 ): Map<MuscleGroup, ExerciseOption[]> {
   const rows = db
     .prepare(
-      `SELECT id, name, muscle_group FROM exercises
+      `SELECT id, name, name_key, muscle_group FROM exercises
        WHERE (user_id IS NULL OR user_id = ?) AND archived = 0
        ORDER BY name COLLATE NOCASE`,
     )
-    .all(userId) as unknown as Array<{ id: number; name: string; muscle_group: MuscleGroup }>;
+    .all(userId) as unknown as Array<{
+    id: number;
+    name: string;
+    name_key: string | null;
+    muscle_group: MuscleGroup;
+  }>;
 
   const buckets = new Map<MuscleGroup, ExerciseOption[]>();
   for (const row of rows) {
     const bucket = buckets.get(row.muscle_group);
     if (bucket) {
-      bucket.push({ id: row.id, name: row.name });
+      bucket.push({ id: row.id, name: row.name, nameKey: row.name_key });
     } else {
-      buckets.set(row.muscle_group, [{ id: row.id, name: row.name }]);
+      buckets.set(row.muscle_group, [{ id: row.id, name: row.name, nameKey: row.name_key }]);
     }
   }
 
