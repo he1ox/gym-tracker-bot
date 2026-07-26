@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CHART_HEIGHT, CHART_WIDTH, COLORS } from './theme';
 import { renderChart } from './render';
+import { weeklyVolumeChart } from './weekly-volume';
 
 // Cabecera PNG: firma de 8 bytes y chunk IHDR con ancho y alto en big-endian.
 // Sin snapshots de píxeles: las fuentes del sistema difieren entre Windows, Linux
@@ -129,5 +130,11 @@ describe('renderChart', () => {
     expect(after).toBe(before);
 
     errors.mockRestore();
+  });
+
+  it('dibuja la gráfica de volumen semanal', async () => {
+    const buffer = await renderChart(weeklyVolumeChart([{ label: 'Pecho', count: 14 }]));
+    expect(buffer).not.toBeNull();
+    expect(pngSize(buffer as Buffer)).toEqual({ width: CHART_WIDTH, height: CHART_HEIGHT });
   });
 });
