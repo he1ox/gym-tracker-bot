@@ -1,0 +1,147 @@
+import type { Overview } from '@gym-tracker/core';
+import { describe, expect, it } from 'vitest';
+import { escapeHtml, renderHelp, renderWelcome } from './welcome';
+
+function metric(current: number, previous: number, changePercent: number | null) {
+  return { current, previous, changePercent };
+}
+
+const EMPTY: Overview = {
+  workouts: metric(0, 0, null),
+  effectiveSets: metric(0, 0, null),
+  reps: metric(0, 0, null),
+  tonnageKg: metric(0, 0, null),
+  heaviest: { ...metric(0, 0, null), exerciseName: null },
+};
+
+const FULL: Overview = {
+  workouts: metric(12, 10, 20),
+  effectiveSets: metric(148, 136, 9),
+  reps: metric(1184, 1221, -3),
+  tonnageKg: metric(58420, 52161, 12),
+  heaviest: { ...metric(140, 135, 4), exerciseName: 'Peso muerto' },
+};
+
+const datas = (rendered: ReturnType<typeof renderWelcome>): string[] =>
+  rendered.keyboard.inline_keyboard.flat().map((b) => ('callback_data' in b ? b.callback_data : ''));
+
+describe('escapeHtml', () => {
+  it('escapes the three characters Telegram HTML cares about', () => {
+    expect(escapeHtml('Curl <martillo> & polea')).toBe('Curl &lt;martillo&gt; &amp; polea');
+  });
+
+  it('escapes ampersands before angle brackets, not after', () => {
+    expect(escapeHtml('<&>')).toBe('&lt;&amp;&gt;');
+  });
+});
+
+describe('renderWelcome', () => {
+  it('greets by name and shows the four buttons', () => {
+    const { text, keyboard } = renderWelcome({ firstName: 'George', overview: FULL });
+    expect(text).toContain('👋 Hola, George');
+    expect(text).toContain('Registra tus series desde aquí');
+    expect(datas({ text, keyboard })).toEqual(['wc:s', 'wc:r', 'wc:l', 'wc:h']);
+  });
+
+  it('drops the name when Telegram gives none', () => {
+    const { text } = renderWelcome({ firstName: null, overview: FULL });
+    expect(text).toContain('👋 Hola\n');
+    expect(text).not.toContain('Hola,');
+  });
+
+  it('renders every figure with its change inside a single <pre> block', () => {
+    const { text } = renderWelcome({ firstName: 'George', overview: FULL });
+    const block = text.slice(text.indexOf('<pre>') + 5, text.indexOf('</pre>'));
+    const lines = block.split('\n');
+
+    expect(text.split('<pre>')).toHaveLength(2); // exactamente un bloque
+    expect(lines[0]).toContain('Últimos 30 días');
+    expect(lines[0]).toContain('vs. 30 anteriores');
+    expect(lines[1]).toContain('12');
+    expect(lines[1]).toContain('▲ 20 %');
+    expect(lines[2]).toContain('148');
+    expect(lines[3]).toContain('1,184'); // separador de millares
+    expect(lines[3]).toContain('▼  3 %'); // bajada
+    expect(lines[4]).toContain('58,420 kg');
+    expect(lines[5]).toContain('140 kg');
+    expect(lines[6]?.trim()).toBe('Peso muerto');
+  });
+
+  it('aligns every metric row to the same width', () => {
+    const { text } = renderWelcome({ firstName: 'George', overview: FULL });
+    const block = text.slice(text.indexOf('<pre>') + 5, text.indexOf('</pre>'));
+    const widths = new Set(block.split('\n').slice(0, 6).map((line) => line.length));
+    expect(widths.size).toBe(1);
+  });
+
+  it('shows every change as a dash for a user with no history and no exercise name', () => {
+    const { text } = renderWelcome({ firstName: 'George', overview: EMPTY });
+    const block = text.slice(text.indexOf('<pre>') + 5, text.indexOf('</pre>'));
+    const rows = block.split('\n');
+    expect(rows).toHaveLength(6); // cabecera + 5 métricas, sin línea de ejercicio
+    for (const row of rows.slice(1)) {
+      expect(row).toContain('—');
+    }
+    expect(text).toContain('Registra tus series desde aquí'); // el texto explica de qué va
+  });
+
+  it('shows a dash for a metric whose previous window was zero', () => {
+    const overview: Overview = { ...FULL, workouts: metric(3, 0, null) };
+    const { text } = renderWelcome({ firstName: 'George', overview });
+    const row = text.split('\n').find((l) => l.includes('Entrenamientos'));
+    expect(row).toContain('—');
+    expect(row).not.toContain('▲');
+  });
+
+  it('shows no arrow when a metric did not move', () => {
+    const overview: Overview = { ...FULL, effectiveSets: metric(148, 148, 0) };
+    const { text } = renderWelcome({ firstName: 'George', overview });
+    const row = text.split('\n').find((l) => l.includes('Series'));
+    expect(row).toContain('0 %');
+    expect(row).not.toContain('▲');
+    expect(row).not.toContain('▼');
+  });
+
+  it('does not round a fractional heaviest weight', () => {
+    const overview: Overview = { ...FULL, heaviest: { ...metric(62.5, 60, 4), exerciseName: 'Curl' } };
+    const { text } = renderWelcome({ firstName: 'George', overview });
+    expect(text).toContain('62.5 kg');
+  });
+
+  it('escapes an own exercise name with HTML characters (§3)', () => {
+    const overview: Overview = {
+      ...FULL,
+      heaviest: { ...metric(140, 135, 4), exerciseName: 'Curl <martillo> & polea' },
+    };
+    const { text } = renderWelcome({ firstName: 'George', overview });
+    expect(text).toContain('Curl &lt;martillo&gt; &amp; polea');
+    expect(text).not.toContain('<martillo>');
+  });
+
+  it('escapes a Telegram first name with HTML characters', () => {
+    const { text } = renderWelcome({ firstName: '<b>George</b>', overview: FULL });
+    expect(text).toContain('&lt;b&gt;George&lt;/b&gt;');
+  });
+});
+
+describe('renderHelp', () => {
+  it('covers both ways of recording, warmup, rest and every command', () => {
+    const { text, keyboard } = renderHelp();
+    for (const needle of [
+      '60x8',
+      '60 x 8',
+      '60x8 rpe8',
+      'sentadilla 100x5',
+      'Calent.',
+      'Descanso',
+      '/start',
+      '/finish',
+      '/routines',
+      '/last',
+      '/help',
+    ]) {
+      expect(text).toContain(needle);
+    }
+    expect(keyboard.inline_keyboard.flat().map((b) => ('callback_data' in b ? b.callback_data : ''))).toEqual(['wc:b']);
+  });
+});

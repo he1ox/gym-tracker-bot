@@ -30,6 +30,14 @@ export const CB = {
     `pick:${origin}:g:${groupIndex}:${offset}`,
   pickExercise: (origin: PickOrigin, exerciseId: number): string => `pick:${origin}:x:${exerciseId}`,
   pickSearch: (origin: PickOrigin): string => `pick:${origin}:s`,
+  // Espacio de la bienvenida (spec §10). Estos NO pasan por parseCallback: sus
+  // handlers usan los filtros por cadena exacta de grammY y se registran ANTES
+  // del catch-all de capture.ts, igual que 'newroutine' en routines-wizard.ts.
+  wcStart: 'wc:s',
+  wcRoutines: 'wc:r',
+  wcHistory: 'wc:l',
+  wcHelp: 'wc:h',
+  wcBack: 'wc:b',
 } as const;
 
 export type CallbackAction =

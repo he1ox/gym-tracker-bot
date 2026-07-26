@@ -125,3 +125,23 @@ describe('callback-data — pick: namespace', () => {
     expect(Buffer.byteLength(worst, 'utf8')).toBeLessThanOrEqual(64);
   });
 });
+
+describe('welcome callback space', () => {
+  it('keeps the five wc: constants distinct and short', () => {
+    const all = [CB.wcStart, CB.wcRoutines, CB.wcHistory, CB.wcHelp, CB.wcBack];
+    expect(new Set(all).size).toBe(5);
+    for (const data of all) {
+      expect(data.startsWith('wc:')).toBe(true);
+      expect(Buffer.byteLength(data, 'utf8')).toBeLessThanOrEqual(64);
+    }
+  });
+
+  it('does not collide with the day:, ex: or pick: spaces', () => {
+    for (const data of [CB.wcStart, CB.wcRoutines, CB.wcHistory, CB.wcHelp, CB.wcBack]) {
+      // parseCallback es el despachador del catch-all de capture.ts, que se
+      // registra DESPUÉS de registerWelcome: un wc: que llegue hasta él es un
+      // error de orden de registro, y 'unknown' es la respuesta correcta (D6).
+      expect(parseCallback(data)).toEqual({ type: 'unknown' });
+    }
+  });
+});
