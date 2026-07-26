@@ -265,5 +265,11 @@ describe('botón 📊 Semana', () => {
     // permanente y ‹ Volver la reconstruye entera de todos modos.
     expect(outgoingCalls(outgoing, 'editMessageText')).toHaveLength(0);
     expect(outgoingCalls(outgoing, 'editMessageReplyMarkup')).toHaveLength(0);
+    // answerCallbackQuery debe ir ANTES de sendPhoto: si no, la ruedita del botón
+    // gira hasta que acabe todo el render y la subida. Sin esta guardia, el handler
+    // podría regresar con ambas acciones sin problema, pero el usuario vería la UI
+    // congelada mientras se genera y sube la imagen.
+    const methods = outgoing.map((c) => c.method);
+    expect(methods.indexOf('answerCallbackQuery')).toBeLessThan(methods.indexOf('sendPhoto'));
   });
 });
