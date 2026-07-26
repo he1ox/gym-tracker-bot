@@ -4,8 +4,10 @@ import { type Api, type Bot, InlineKeyboard } from 'grammy';
 import type { DatabaseSync } from 'node:sqlite';
 import { buildUserSummary } from '../services/overview-service';
 import { withCurrent } from '../i18n/current';
-import { localizeGroups } from '../i18n/exercise-name';
+import { groupLabel, localizeGroups } from '../i18n/exercise-name';
 import { buildDayOptions } from '../services/session-service';
+import type { GroupVolume } from '../services/weekly-volume';
+import { volumeBars } from '../charts/volume-bars';
 import { CB } from './callback-data';
 import type { CustomContext } from './context';
 import { renderPicker } from './exercise-picker';
@@ -16,6 +18,7 @@ import { T } from './texts';
 export interface WelcomeModel {
   firstName: string | null;
   overview: Overview;
+  weeklyVolume: GroupVolume[];
 }
 
 // Exportada porque registerWelcome (Tarea 7) la usa en la firma de su helper de edición.
@@ -92,7 +95,20 @@ function metricsBlock(overview: Overview): string {
   return `<pre>${rows.join('\n')}</pre>`;
 }
 
+/**
+ * Barras de texto de la semana, en su propio <pre>. Las etiquetas salen del
+ * catálogo de grupos musculares, no del usuario: no hay nada que escapar.
+ */
+function volumeBlock(rows: readonly GroupVolume[]): string | null {
+  if (rows.length === 0) {
+    return null;
+  }
+  const lines = volumeBars(rows.map((row) => ({ label: groupLabel(row.group), count: row.count })));
+  return `<pre>${[T.welcomeVolumeTitle, ...lines].join('\n')}</pre>`;
+}
+
 export function renderWelcome(model: WelcomeModel): Rendered {
+  const volume = volumeBlock(model.weeklyVolume);
   const text = [
     escapeHtml(T.welcomeGreeting(model.firstName)),
     '',
@@ -101,6 +117,7 @@ export function renderWelcome(model: WelcomeModel): Rendered {
     T.welcomeSettingsHint,
     '',
     metricsBlock(model.overview),
+    ...(volume === null ? [] : ['', volume]),
   ].join('\n');
 
   // Cada .row() lleva otro botón detrás: el idioma `.text(x).row()` solo es seguro
@@ -130,6 +147,7 @@ export function welcomeModel(db: DatabaseSync, ctx: CustomContext, timezone: str
   return {
     firstName: firstName === undefined || firstName === '' ? null : firstName,
     overview: summary.overview,
+    weeklyVolume: summary.weeklyVolume,
   };
 }
 

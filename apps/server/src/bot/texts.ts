@@ -256,6 +256,9 @@ export const T = {
   get welcomeSettingsHint(): string {
     return t('welcomeSettingsHint');
   },
+  get welcomeVolumeTitle(): string {
+    return t('welcomeVolumeTitle');
+  },
   welcomeGreeting(firstName: string | null): string {
     return firstName === null ? t('welcomeGreeting') : t('welcomeGreetingNamed', { name: firstName });
   },

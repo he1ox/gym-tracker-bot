@@ -49,20 +49,20 @@ describe('escapeHtml', () => {
 
 describe('renderWelcome', () => {
   it('greets by name and shows the four buttons', () => {
-    const { text, keyboard } = renderWelcome({ firstName: 'George', overview: FULL });
+    const { text, keyboard } = renderWelcome({ firstName: 'George', overview: FULL, weeklyVolume: [] });
     expect(text).toContain('👋 Hola, George');
     expect(text).toContain('Registra tus series desde aquí');
     expect(datas({ text, keyboard })).toEqual(['wc:s', 'wc:r', 'wc:l', 'wc:h']);
   });
 
   it('drops the name when Telegram gives none', () => {
-    const { text } = renderWelcome({ firstName: null, overview: FULL });
+    const { text } = renderWelcome({ firstName: null, overview: FULL, weeklyVolume: [] });
     expect(text).toContain('👋 Hola\n');
     expect(text).not.toContain('Hola,');
   });
 
   it('renders every figure with its change inside a single <pre> block', () => {
-    const { text } = renderWelcome({ firstName: 'George', overview: FULL });
+    const { text } = renderWelcome({ firstName: 'George', overview: FULL, weeklyVolume: [] });
     const block = text.slice(text.indexOf('<pre>') + 5, text.indexOf('</pre>'));
     const lines = block.split('\n');
 
@@ -80,7 +80,7 @@ describe('renderWelcome', () => {
   });
 
   it('aligns every metric row to the same width', () => {
-    const { text } = renderWelcome({ firstName: 'George', overview: FULL });
+    const { text } = renderWelcome({ firstName: 'George', overview: FULL, weeklyVolume: [] });
     const block = text.slice(text.indexOf('<pre>') + 5, text.indexOf('</pre>'));
     const widths = new Set(block.split('\n').slice(0, 6).map((line) => line.length));
     expect(widths.size).toBe(1);
@@ -88,7 +88,7 @@ describe('renderWelcome', () => {
 
   it('pinta la tabla con la unidad activa y sin descuadrar', () => {
     setCurrent({ locale: 'es', unit: 'lb', step: 2.5 });
-    const { text } = renderWelcome({ firstName: 'George', overview: FULL });
+    const { text } = renderWelcome({ firstName: 'George', overview: FULL, weeklyVolume: [] });
     expect(text).toContain('lb');
     expect(text).not.toContain('kg');
     const block = text.slice(text.indexOf('<pre>') + 5, text.indexOf('</pre>'));
@@ -99,11 +99,11 @@ describe('renderWelcome', () => {
 
   it('menciona /settings en la bienvenida', () => {
     setCurrent({ locale: 'es', unit: 'kg', step: 2.5 });
-    expect(renderWelcome({ firstName: 'George', overview: FULL }).text).toContain('/settings');
+    expect(renderWelcome({ firstName: 'George', overview: FULL, weeklyVolume: [] }).text).toContain('/settings');
   });
 
   it('shows every change as a dash for a user with no history and no exercise name', () => {
-    const { text } = renderWelcome({ firstName: 'George', overview: EMPTY });
+    const { text } = renderWelcome({ firstName: 'George', overview: EMPTY, weeklyVolume: [] });
     const block = text.slice(text.indexOf('<pre>') + 5, text.indexOf('</pre>'));
     const rows = block.split('\n');
     expect(rows).toHaveLength(6); // cabecera + 5 métricas, sin línea de ejercicio
@@ -115,7 +115,7 @@ describe('renderWelcome', () => {
 
   it('shows a dash for a metric whose previous window was zero', () => {
     const overview: Overview = { ...FULL, workouts: metric(3, 0, null) };
-    const { text } = renderWelcome({ firstName: 'George', overview });
+    const { text } = renderWelcome({ firstName: 'George', overview, weeklyVolume: [] });
     const row = text.split('\n').find((l) => l.includes('Entrenamientos'));
     expect(row).toContain('—');
     expect(row).not.toContain('▲');
@@ -123,7 +123,7 @@ describe('renderWelcome', () => {
 
   it('shows no arrow when a metric did not move', () => {
     const overview: Overview = { ...FULL, effectiveSets: metric(148, 148, 0) };
-    const { text } = renderWelcome({ firstName: 'George', overview });
+    const { text } = renderWelcome({ firstName: 'George', overview, weeklyVolume: [] });
     const row = text.split('\n').find((l) => l.includes('Series'));
     expect(row).toContain('0 %');
     expect(row).not.toContain('▲');
@@ -132,7 +132,7 @@ describe('renderWelcome', () => {
 
   it('does not round a fractional heaviest weight', () => {
     const overview: Overview = { ...FULL, heaviest: { ...metric(62.5, 60, 4), exerciseName: 'Curl' } };
-    const { text } = renderWelcome({ firstName: 'George', overview });
+    const { text } = renderWelcome({ firstName: 'George', overview, weeklyVolume: [] });
     expect(text).toContain('62.5 kg');
   });
 
@@ -141,14 +141,38 @@ describe('renderWelcome', () => {
       ...FULL,
       heaviest: { ...metric(140, 135, 4), exerciseName: 'Curl <martillo> & polea' },
     };
-    const { text } = renderWelcome({ firstName: 'George', overview });
+    const { text } = renderWelcome({ firstName: 'George', overview, weeklyVolume: [] });
     expect(text).toContain('Curl &lt;martillo&gt; &amp; polea');
     expect(text).not.toContain('<martillo>');
   });
 
   it('escapes a Telegram first name with HTML characters', () => {
-    const { text } = renderWelcome({ firstName: '<b>George</b>', overview: FULL });
+    const { text } = renderWelcome({ firstName: '<b>George</b>', overview: FULL, weeklyVolume: [] });
     expect(text).toContain('&lt;b&gt;George&lt;/b&gt;');
+  });
+});
+
+describe('bloque de volumen semanal', () => {
+  it('pinta un segundo <pre> con una fila por grupo entrenado', () => {
+    const { text } = renderWelcome({
+      firstName: 'George',
+      overview: FULL,
+      weeklyVolume: [
+        { group: 'chest', count: 14 },
+        { group: 'biceps', count: 6 },
+      ],
+    });
+    expect(text.split('<pre>')).toHaveLength(3); // la tabla de métricas y las barras
+    expect(text).toContain('Series por músculo');
+    expect(text).toContain('Pecho');
+    expect(text).toContain('█████│██░░░ 14');
+    expect(text).toContain('Bíceps');
+  });
+
+  it('no pinta el bloque cuando la semana no tiene series', () => {
+    const { text } = renderWelcome({ firstName: 'George', overview: FULL, weeklyVolume: [] });
+    expect(text.split('<pre>')).toHaveLength(2); // solo la tabla de métricas
+    expect(text).not.toContain('Series por músculo');
   });
 });
 

@@ -106,6 +106,7 @@ export const es = {
     welcomeGreeting: '👋 Hola',
     welcomeGreetingNamed: '👋 Hola, {{name}}',
     welcomeSettingsHint: 'Puedes cambiar el idioma y las unidades en /settings.',
+    welcomeVolumeTitle: 'Series por músculo · esta semana',
 
     helpText: [
       '❓ <b>Cómo funciona</b>',

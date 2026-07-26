@@ -92,6 +92,7 @@ export const en = {
     welcomeGreeting: '👋 Hello',
     welcomeGreetingNamed: '👋 Hello, {{name}}',
     welcomeSettingsHint: 'You can change the language and the units in /settings.',
+    welcomeVolumeTitle: 'Sets per muscle · this week',
 
     helpText: [
       '❓ <b>How it works</b>',
