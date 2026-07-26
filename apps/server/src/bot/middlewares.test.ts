@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MIGRATIONS_DIR, getUserByTelegramId, openDatabase, runMigrations } from '@gym-tracker/db';
-import { auth } from './auth';
+import { auth, detectLocale } from './auth';
 import { dedup } from './dedup';
 import type { CustomContext } from './context';
 
@@ -54,5 +54,28 @@ describe('auth middleware', () => {
     expect(c.user.telegramUserId).toBe(111);
     expect(c.user.timezone).toBe('Europe/Madrid');
     expect(getUserByTelegramId(d, 111)?.id).toBe(c.user.id);
+  });
+
+  it('da de alta al usuario con el idioma de su Telegram', async () => {
+    const d = db();
+    const c = {
+      update: { update_id: 1 },
+      from: { id: 111, language_code: 'pt-BR' },
+    } as unknown as CustomContext;
+    await auth(d, config)(c, async () => {});
+    expect(getUserByTelegramId(d, 111)?.locale).toBe('en');
+  });
+});
+
+describe('detectLocale', () => {
+  it('solo el español da es; todo lo demás cae en inglés', () => {
+    expect(detectLocale('es')).toBe('es');
+    expect(detectLocale('es-MX')).toBe('es');
+    expect(detectLocale('es-419')).toBe('es');
+    expect(detectLocale('en')).toBe('en');
+    expect(detectLocale('pt-BR')).toBe('en');
+    expect(detectLocale('fr')).toBe('en');
+    expect(detectLocale(undefined)).toBe('en');
+    expect(detectLocale('')).toBe('en');
   });
 });

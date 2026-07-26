@@ -1,8 +1,9 @@
 import type { Overview } from '@gym-tracker/core';
-import { listExercisesByMuscleGroup } from '@gym-tracker/db';
+import { type Locale, listExercisesByMuscleGroup } from '@gym-tracker/db';
 import { type Api, type Bot, InlineKeyboard } from 'grammy';
 import type { DatabaseSync } from 'node:sqlite';
 import { buildUserOverview } from '../services/overview-service';
+import { withCurrent } from '../i18n/current';
 import { localizeGroups } from '../i18n/exercise-name';
 import { buildDayOptions } from '../services/session-service';
 import { CB } from './callback-data';
@@ -97,6 +98,8 @@ export function renderWelcome(model: WelcomeModel): Rendered {
     '',
     T.welcomeIntro,
     '',
+    T.welcomeSettingsHint,
+    '',
     metricsBlock(model.overview),
   ].join('\n');
 
@@ -188,14 +191,21 @@ export function registerWelcome(
 }
 
 /** El menú ☰ de Telegram (spec §6). El orden es el de la tabla del spec. */
-export const BOT_COMMANDS = [
-  { command: 'start', description: 'Inicio y resumen' },
-  { command: 'finish', description: 'Terminar el entrenamiento' },
-  { command: 'routines', description: 'Mis rutinas' },
-  { command: 'last', description: 'Historial de un ejercicio' },
-  { command: 'help', description: 'Cómo funciona' },
-] as const;
+const COMMAND_ORDER = ['start', 'finish', 'routines', 'last', 'help', 'settings'] as const;
 
+export function botCommands(locale: Locale): Array<{ command: string; description: string }> {
+  // Las descripciones salen del catálogo del idioma pedido, no del estado global:
+  // setBotCommands registra el menú de TODOS los idiomas de una vez, al arrancar.
+  return withCurrent({ locale, unit: 'kg', step: 2.5 }, () =>
+    COMMAND_ORDER.map((command) => ({ command, description: T.commandDescription(command) })),
+  );
+}
+
+/**
+ * Registra el menú una vez por idioma. La llamada SIN language_code define el
+ * menú por defecto, y por eso lleva el inglés: es el idioma de reserva.
+ */
 export async function setBotCommands(api: Api): Promise<void> {
-  await api.setMyCommands(BOT_COMMANDS.map((c) => ({ ...c })));
+  await api.setMyCommands(botCommands('en'));
+  await api.setMyCommands(botCommands('es'), { language_code: 'es' });
 }

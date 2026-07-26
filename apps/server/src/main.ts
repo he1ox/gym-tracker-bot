@@ -4,9 +4,11 @@ import { MIGRATIONS_DIR, openDatabase, runMigrations } from '@gym-tracker/db';
 import { createBot } from './bot/bot';
 import { setBotCommands } from './bot/welcome';
 import { ConfigError, loadConfig } from './config';
+import { initI18n } from './i18n/index';
 
 function main(): void {
   const config = loadConfig();
+  initI18n(); // antes de crear el bot: cualquier handler puede pintar texto
   mkdirSync(dirname(config.dbPath), { recursive: true });
   const db = openDatabase(config.dbPath);
   const applied = runMigrations(db, MIGRATIONS_DIR);

@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { setCurrent } from '../i18n/current';
 import { initI18n } from '../i18n/index';
 import { BOT_INFO, makeHarness } from './test-harness';
-import { escapeHtml, renderHelp, renderWelcome, setBotCommands } from './welcome';
+import { botCommands, escapeHtml, renderHelp, renderWelcome, setBotCommands } from './welcome';
 
 // Los renders leen el idioma del estado global; estos tests no pasan por el
 // middleware de preferencias, así que lo fijan a mano.
@@ -97,6 +97,11 @@ describe('renderWelcome', () => {
     setCurrent({ locale: 'es', unit: 'kg', step: 2.5 });
   });
 
+  it('menciona /settings en la bienvenida', () => {
+    setCurrent({ locale: 'es', unit: 'kg', step: 2.5 });
+    expect(renderWelcome({ firstName: 'George', overview: FULL }).text).toContain('/settings');
+  });
+
   it('shows every change as a dash for a user with no history and no exercise name', () => {
     const { text } = renderWelcome({ firstName: 'George', overview: EMPTY });
     const block = text.slice(text.indexOf('<pre>') + 5, text.indexOf('</pre>'));
@@ -170,7 +175,7 @@ describe('renderHelp', () => {
 });
 
 describe('setBotCommands', () => {
-  it('registers exactly the five commands of the spec, in order', async () => {
+  it('registers the six commands of the spec once per language, in order', async () => {
     const d = openDatabase(':memory:');
     runMigrations(d, MIGRATIONS_DIR);
     createUser(d, { telegramUserId: 111, timezone: 'UTC', locale: 'es', createdAt: 0 });
@@ -178,14 +183,32 @@ describe('setBotCommands', () => {
 
     await setBotCommands(bot.api);
 
-    const call = outgoing.find((c) => c.method === 'setMyCommands');
-    expect(call).toBeDefined();
-    expect(call?.payload.commands).toEqual([
+    const calls = outgoing.filter((c) => c.method === 'setMyCommands');
+    expect(calls).toHaveLength(2);
+    // La primera va SIN language_code: es el menú por defecto, en inglés.
+    expect(calls[0]?.payload.language_code).toBeUndefined();
+    expect(calls[0]?.payload.commands).toEqual([
+      { command: 'start', description: 'Home and progress' },
+      { command: 'finish', description: 'Finish the workout' },
+      { command: 'routines', description: 'My routines' },
+      { command: 'last', description: 'History of an exercise' },
+      { command: 'help', description: 'How it works' },
+      { command: 'settings', description: 'Language and units' },
+    ]);
+    expect(calls[1]?.payload.language_code).toBe('es');
+    expect(calls[1]?.payload.commands).toEqual([
       { command: 'start', description: 'Inicio y resumen' },
       { command: 'finish', description: 'Terminar el entrenamiento' },
       { command: 'routines', description: 'Mis rutinas' },
       { command: 'last', description: 'Historial de un ejercicio' },
       { command: 'help', description: 'Cómo funciona' },
+      { command: 'settings', description: 'Idioma y unidades' },
     ]);
+  });
+
+  it('botCommands traduce las descripciones e incluye settings', () => {
+    expect(botCommands('en').map((c) => c.command)).toContain('settings');
+    expect(botCommands('en').find((c) => c.command === 'help')?.description).toBe('How it works');
+    expect(botCommands('es').find((c) => c.command === 'help')?.description).toBe('Cómo funciona');
   });
 });
