@@ -22,6 +22,7 @@ export const en = {
 
     finishTitle: '✅ Workout finished',
     recordIcon: '🏆',
+    chartWeeklyCaption: '📊 Week {{from}} – {{to}} · {{sets}}',
 
     sessionEndedToast: 'Session ended. Use /start.',
     noActiveSessionToast: 'You have no active session. Use /start.',

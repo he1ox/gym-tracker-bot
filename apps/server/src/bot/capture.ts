@@ -32,6 +32,7 @@ import type { RestTimers } from './rest-timer';
 import { renderFinishSummary, renderSession } from './session-view';
 import { T, parseErrorText } from './texts';
 import { sendWelcome } from './welcome';
+import { sendWeeklyChart } from './weekly-chart';
 
 function isNotModified(error: unknown): boolean {
   return error instanceof GrammyError && error.description.includes('message is not modified');
@@ -193,7 +194,28 @@ async function handleStart(
   await sendWelcome(ctx, db, timezone);
 }
 
-async function handleFinish(ctx: CustomContext, db: DatabaseSync, restTimers: RestTimers): Promise<void> {
+/** El resumen sobre el mensaje activo, con el mismo comportamiento de siempre. */
+async function showFinishSummary(ctx: CustomContext, session: BotSessionRow, text: string): Promise<void> {
+  if (session.messageId !== null) {
+    try {
+      await ctx.api.editMessageText(session.chatId, session.messageId, text, { reply_markup: new InlineKeyboard() });
+      return;
+    } catch (error) {
+      if (isNotModified(error)) {
+        return;
+      }
+      // El mensaje activo ya no es editable: cae al sendMessage de abajo.
+    }
+  }
+  await ctx.api.sendMessage(session.chatId, text);
+}
+
+async function handleFinish(
+  ctx: CustomContext,
+  db: DatabaseSync,
+  restTimers: RestTimers,
+  timezone: string,
+): Promise<void> {
   const userId = ctx.user.id;
   const session = getSession(db, userId);
   if (!session) {
@@ -205,18 +227,10 @@ async function handleFinish(ctx: CustomContext, db: DatabaseSync, restTimers: Re
     await ctx.api.deleteMessage(session.chatId, session.ephemeralMessageId).catch(() => {});
   }
   const summary = finishWorkout(db, { session, now: Date.now() });
-  const text = renderFinishSummary(summary);
-  if (session.messageId !== null) {
-    try {
-      await ctx.api.editMessageText(session.chatId, session.messageId, text, { reply_markup: new InlineKeyboard() });
-      return;
-    } catch (error) {
-      if (isNotModified(error)) {
-        return;
-      }
-    }
-  }
-  await ctx.api.sendMessage(session.chatId, text);
+  await showFinishSummary(ctx, session, renderFinishSummary(summary));
+  // Después del resumen y con la sesión ya cerrada: nada se va a repintar, así que
+  // la foto no rompe ninguna pantalla editable.
+  await sendWeeklyChart(ctx, db, timezone);
 }
 
 async function handleCallback(ctx: CustomContext, db: DatabaseSync, restTimers: RestTimers): Promise<void> {
@@ -475,7 +489,7 @@ export function registerCapture(
   restTimers: RestTimers,
 ): void {
   bot.command('start', (ctx) => handleStart(ctx, db, restTimers, config.timezone));
-  bot.command('finish', (ctx) => handleFinish(ctx, db, restTimers));
+  bot.command('finish', (ctx) => handleFinish(ctx, db, restTimers, config.timezone));
   bot.on('callback_query:data', (ctx) => handleCallback(ctx, db, restTimers));
   bot.on('message:text', (ctx, next) => handleText(ctx, db, restTimers, next));
 }

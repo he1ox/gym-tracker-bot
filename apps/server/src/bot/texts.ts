@@ -62,6 +62,9 @@ export const T = {
   get recordIcon(): string {
     return t('recordIcon');
   },
+  chartWeeklyCaption(from: string, to: string, sets: number): string {
+    return t('chartWeeklyCaption', { from, to, sets: t('setsCount', { count: sets }) });
+  },
 
   // Toasts / errores
   get sessionEndedToast(): string {

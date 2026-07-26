@@ -31,6 +31,7 @@ export const es = {
     // Fin
     finishTitle: '✅ Entrenamiento terminado',
     recordIcon: '🏆',
+    chartWeeklyCaption: '📊 Semana {{from}} – {{to}} · {{sets}}',
 
     // Toasts / errores
     sessionEndedToast: 'Sesión terminada. Usa /start.',

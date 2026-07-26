@@ -53,7 +53,9 @@ export function makeHarness(
       throw new Error(`simulated failure for ${method}`);
     }
     let result: unknown = true;
-    if (method === 'sendMessage') {
+    // sendPhoto necesita la misma respuesta con forma de mensaje que sendMessage:
+    // sin ella, grammY devuelve `true` y cualquier `.message_id` posterior revienta.
+    if (method === 'sendMessage' || method === 'sendPhoto') {
       seq += 1;
       result = { message_id: seq, date: 0, chat: { id: payload.chat_id, type: 'private' } };
     }
@@ -119,4 +121,9 @@ export function callbackUpdate(updateId: number, data: string, messageId: number
       },
     },
   } as unknown as AnyUpdate;
+}
+
+/** Llamadas a un método concreto (sendPhoto, editMessageReplyMarkup…). */
+export function outgoingCalls(outgoing: readonly OutgoingCall[], method: string): OutgoingCall[] {
+  return outgoing.filter((c) => c.method === method);
 }
