@@ -37,6 +37,11 @@ export const CB = {
   wcHistory: 'wc:l',
   wcHelp: 'wc:h',
   wcBack: 'wc:b',
+  // Espacio de /settings. Como wc:*, estos NO pasan por parseCallback: sus handlers
+  // usan filtros por cadena exacta y se registran ANTES del catch-all de capture.ts.
+  setLocale: (locale: string): string => `set:l:${locale}`,
+  setUnit: (unit: string): string => `set:u:${unit}`,
+  setStep: (step: number): string => `set:s:${step}`,
 } as const;
 
 export type CallbackAction =

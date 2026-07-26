@@ -9,6 +9,7 @@ import { registerLast } from './last';
 import { preferences } from './preferences';
 import { createRestTimers } from './rest-timer';
 import { registerRoutines } from './routines-wizard';
+import { registerSettings } from './settings';
 import { T } from './texts';
 import { registerWelcome } from './welcome';
 
@@ -39,6 +40,7 @@ export function createBot(
   // ejecutaría. Es la misma trampa que obligó a meter el segmento de origen en el
   // espacio pick: (ver el comentario de callback-data.ts).
   registerWelcome(bot, db, config);
+  registerSettings(bot, db);
 
   const restTimers = createRestTimers({
     send: async (chatId, text) => (await bot.api.sendMessage(chatId, text)).message_id,
