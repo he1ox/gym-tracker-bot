@@ -1,3 +1,4 @@
+import { snapshot, withCurrent } from '../i18n/current';
 import { T } from './texts';
 
 export interface RestTimers {
@@ -29,11 +30,21 @@ export function createRestTimers(deps: {
   return {
     schedule({ userId, chatId, seconds, exerciseName }) {
       cancel(userId);
+      // El aviso se construye MÁS TARDE, fuera del ciclo de vida de este update:
+      // si leyera el estado global en ese momento cogería el idioma de cualquier
+      // otro update que hubiera entrado en medio. Se congela aquí.
+      const prefs = snapshot();
       const handle = setTimeout(() => {
         void (async () => {
           entries.delete(userId);
           try {
-            const messageId = await deps.send(chatId, T.restDoneMessage(exerciseName));
+            // deps.rerender queda FUERA de withCurrent a propósito: el mensaje de
+            // sesión debe pintarse con el idioma actual del usuario, no con el de
+            // hace tres minutos.
+            const messageId = await deps.send(
+              chatId,
+              withCurrent(prefs, () => T.restDoneMessage(exerciseName)),
+            );
             deps.storeEphemeral(userId, messageId);
             await deps.rerender(userId);
           } catch (error) {

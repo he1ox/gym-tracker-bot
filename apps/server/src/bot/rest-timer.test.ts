@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { setCurrent } from '../i18n/current';
+import { initI18n } from '../i18n/index';
 import { createRestTimers } from './rest-timer';
 
 beforeEach(() => vi.useFakeTimers());
@@ -60,5 +62,27 @@ describe('createRestTimers', () => {
     timers.schedule({ userId: 1, chatId: 5, seconds: 30, exerciseName: 'B' });
     await vi.advanceTimersByTimeAsync(60_000);
     expect(sent).toHaveLength(1); // solo el segundo timer sobrevive
+  });
+
+  it('usa el idioma de cuando se programó, no el del update que llegue después', async () => {
+    initI18n();
+    const sent: string[] = [];
+    const timers = createRestTimers({
+      send: async (_chatId, text) => {
+        sent.push(text);
+        return 1;
+      },
+      storeEphemeral: () => {},
+      rerender: async () => {},
+    });
+
+    setCurrent({ locale: 'es', unit: 'kg', step: 2.5 });
+    timers.schedule({ userId: 1, chatId: 10, seconds: 60, exerciseName: 'Sentadilla con barra' });
+
+    // Entre programar y disparar entra un update de otro idioma.
+    setCurrent({ locale: 'en', unit: 'lb', step: 5 });
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(sent).toEqual(['⏱ Descanso terminado — Sentadilla con barra']);
   });
 });
