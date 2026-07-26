@@ -194,7 +194,24 @@ Fonts conservado), está en la tabla de SPEC §3 y razonado en `DECISIONS.md`.
 **Nada de funcionalidad inventada.** Si el spec no lo pide, no se implementa; ante una
 ambigüedad de producto, se pregunta al autor en vez de asumir.
 
-## 9. Antes de dar algo por terminado
+## 9. i18n
+
+Los textos del bot viven en `apps/server/src/i18n/locales/{es,en}.ts` y se resuelven con
+`i18next`. El idioma, la unidad y el salto de peso del update en curso están en el módulo
+global `apps/server/src/i18n/current.ts`, que rellena el middleware `bot/preferences.ts`.
+
+**Regla obligatoria:** cualquier código que genere texto FUERA del ciclo de vida de un update
+(un `setTimeout`, un cron, un webhook, una tarea diferida) debe capturar `snapshot()` cuando se
+programa y restaurarlo con `withCurrent()` cuando se ejecuta. `bot/rest-timer.ts` es el ejemplo.
+Sin eso, el mensaje puede salir en el idioma de otro usuario o de otro update.
+
+Añadir un idioma: un fichero nuevo en `locales/`, una entrada en `LOCALES` (`i18n/index.ts`) y
+ampliar el `CHECK` de `users.locale` con una migración. El test `i18n/parity.test.ts` obliga a
+traducir el catálogo entero.
+
+Cambiar de unidad NO convierte ningún peso: es solo una etiqueta.
+
+## 10. Antes de dar algo por terminado
 
 ```bash
 pnpm test && pnpm typecheck && pnpm --filter @gym-tracker/web build

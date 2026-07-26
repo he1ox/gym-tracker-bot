@@ -195,6 +195,18 @@ Flujo mínimo:
 - `/routines` — gestión de rutinas desde el bot (crear, editar días y ejercicios).
 - `/backup` — envía el archivo `.db` por Telegram.
 - `/last <ejercicio>` — consulta rápida del histórico reciente de un ejercicio.
+- `/settings` — idioma (español/inglés) y unidad de peso (kg/lb), además del salto de los
+  botones de peso (1, 2.5, 5, 10).
+
+### Idioma y unidades
+
+El idioma inicial sale del `language_code` de Telegram: si empieza por `es` el bot habla
+español, y en cualquier otro caso inglés, que es el idioma de reserva.
+
+**La unidad de peso es solo una etiqueta: cambiarla no convierte nada.** `sets.weight_kg`
+guarda el número tal cual lo escribió el usuario, en la unidad que tuviera configurada en
+ese momento, así que el histórico de quien cambie de unidad mezcla kg y lb, y los agregados
+que crucen el cambio (tonelaje, récords, 1RM) suman valores heterogéneos.
 
 ### Robustez
 

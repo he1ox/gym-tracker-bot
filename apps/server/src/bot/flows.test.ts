@@ -431,4 +431,29 @@ describe('welcome screen and discoverability', () => {
     // Y el mensaje activo anterior se borra: un solo mensaje activo por sesión.
     expect(outgoing.some((c) => c.method === 'deleteMessage' && c.payload.message_id === MSG)).toBe(true);
   });
+
+  it('un usuario en inglés con libras registra una serie de principio a fin', async () => {
+    const d = baseDb();
+    const { bot, outgoing } = makeHarness(d, BOT_INFO, CONFIG);
+    // Preferencias: en/lb/5.
+    await bot.handleUpdate(commandUpdate(1, 'settings'));
+    await bot.handleUpdate(callbackUpdate(2, 'set:l:en', MSG));
+    await bot.handleUpdate(callbackUpdate(3, 'set:u:lb', MSG));
+    await bot.handleUpdate(callbackUpdate(4, 'set:s:5', MSG));
+
+    await bot.handleUpdate(commandUpdate(5, 'start'));
+    expect(outgoingTexts(outgoing, 'sendMessage').at(-1)).toContain('/settings');
+
+    await bot.handleUpdate(callbackUpdate(6, 'free', MSG + 1));
+    await bot.handleUpdate(textUpdate(7, 'squat 100x5'));
+
+    const active = outgoingTexts(outgoing, 'editMessageText').at(-1) ?? '';
+    expect(active).toContain('Barbell squat'); // nombre traducido por name_key
+    expect(active).toContain('lb'); // etiqueta de unidad, sin conversión
+    expect(active).toContain('100×5'); // el número es el que escribió
+    expect(lastKeyboardDatas(outgoing, 'editMessageText')).toContain('w+');
+
+    await bot.handleUpdate(commandUpdate(8, 'finish'));
+    expect(outgoingTexts(outgoing, 'editMessageText').at(-1)).toContain('Workout finished');
+  });
 });
