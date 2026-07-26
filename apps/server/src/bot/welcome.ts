@@ -1,6 +1,6 @@
 import type { Overview } from '@gym-tracker/core';
 import { listExercisesByMuscleGroup } from '@gym-tracker/db';
-import { type Bot, InlineKeyboard } from 'grammy';
+import { type Api, type Bot, InlineKeyboard } from 'grammy';
 import type { DatabaseSync } from 'node:sqlite';
 import { buildUserOverview } from '../services/overview-service';
 import { buildDayOptions } from '../services/session-service';
@@ -176,4 +176,17 @@ export function registerWelcome(
     await edit(ctx, picker, false);
     await ctx.answerCallbackQuery();
   });
+}
+
+/** El menú ☰ de Telegram (spec §6). El orden es el de la tabla del spec. */
+export const BOT_COMMANDS = [
+  { command: 'start', description: 'Inicio y resumen' },
+  { command: 'finish', description: 'Terminar el entrenamiento' },
+  { command: 'routines', description: 'Mis rutinas' },
+  { command: 'last', description: 'Historial de un ejercicio' },
+  { command: 'help', description: 'Cómo funciona' },
+] as const;
+
+export async function setBotCommands(api: Api): Promise<void> {
+  await api.setMyCommands(BOT_COMMANDS.map((c) => ({ ...c })));
 }

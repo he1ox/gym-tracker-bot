@@ -73,8 +73,8 @@ pnpm vitest run --project web -t "heatmap"
 pnpm vitest --project web
 ```
 
-Referencia de lo que debe salir en verde ahora mismo: **211 tests en 42 archivos**
-(150 en `node`, 61 en `web`).
+Referencia de lo que debe salir en verde ahora mismo: **338 tests en 47 archivos**
+(271 en `node`, 67 en `web`).
 
 Los tests viven junto al código que prueban (`foo.ts` → `foo.test.ts`), no en un árbol
 `__tests__` aparte.

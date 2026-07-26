@@ -1,6 +1,8 @@
 import type { Overview } from '@gym-tracker/core';
+import { MIGRATIONS_DIR, createUser, openDatabase, runMigrations } from '@gym-tracker/db';
 import { describe, expect, it } from 'vitest';
-import { escapeHtml, renderHelp, renderWelcome } from './welcome';
+import { BOT_INFO, makeHarness } from './test-harness';
+import { escapeHtml, renderHelp, renderWelcome, setBotCommands } from './welcome';
 
 function metric(current: number, previous: number, changePercent: number | null) {
   return { current, previous, changePercent };
@@ -143,5 +145,26 @@ describe('renderHelp', () => {
       expect(text).toContain(needle);
     }
     expect(keyboard.inline_keyboard.flat().map((b) => ('callback_data' in b ? b.callback_data : ''))).toEqual(['wc:b']);
+  });
+});
+
+describe('setBotCommands', () => {
+  it('registers exactly the five commands of the spec, in order', async () => {
+    const d = openDatabase(':memory:');
+    runMigrations(d, MIGRATIONS_DIR);
+    createUser(d, { telegramUserId: 111, timezone: 'UTC', createdAt: 0 });
+    const { bot, outgoing } = makeHarness(d, BOT_INFO, { allowedTelegramIds: [111], timezone: 'UTC' });
+
+    await setBotCommands(bot.api);
+
+    const call = outgoing.find((c) => c.method === 'setMyCommands');
+    expect(call).toBeDefined();
+    expect(call?.payload.commands).toEqual([
+      { command: 'start', description: 'Inicio y resumen' },
+      { command: 'finish', description: 'Terminar el entrenamiento' },
+      { command: 'routines', description: 'Mis rutinas' },
+      { command: 'last', description: 'Historial de un ejercicio' },
+      { command: 'help', description: 'Cómo funciona' },
+    ]);
   });
 });
