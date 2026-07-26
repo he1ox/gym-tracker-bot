@@ -1,5 +1,28 @@
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { MIGRATIONS_DIR, openDatabase, runMigrations } from './index';
+
+/**
+ * Copia las primeras `count` migraciones a un directorio temporal, con su journal
+ * recortado. Sirve para simular una BD que se quedó en una versión anterior: sin
+ * esto, todos los tests migran desde cero y nunca ejercitan una actualización
+ * sobre datos ya existentes.
+ */
+function partialMigrationsDir(count: number): string {
+  const journal = JSON.parse(
+    readFileSync(join(MIGRATIONS_DIR, 'meta', '_journal.json'), 'utf8'),
+  ) as { entries: Array<{ idx: number; tag: string }> };
+  const entries = [...journal.entries].sort((a, b) => a.idx - b.idx).slice(0, count);
+  const dir = mkdtempSync(join(tmpdir(), 'gym-migrations-'));
+  mkdirSync(join(dir, 'meta'));
+  writeFileSync(join(dir, 'meta', '_journal.json'), JSON.stringify({ ...journal, entries }));
+  for (const entry of entries) {
+    copyFileSync(join(MIGRATIONS_DIR, `${entry.tag}.sql`), join(dir, `${entry.tag}.sql`));
+  }
+  return dir;
+}
 
 const EXPECTED_TABLES = [
   'bot_sessions',
@@ -108,6 +131,33 @@ describe('runMigrations', () => {
       .get() as { n: number };
     expect(withKey.n).toBe(51);
     expect(withoutKey.n).toBe(0);
+    db.close();
+  });
+
+  it('0002 actualiza una BD que YA tiene un usuario con datos colgando de él', () => {
+    // El caso real: la 0002 recrea la tabla users (DROP + RENAME) y las FK están
+    // activas, así que las filas hijas la bloquean. Migrar desde cero no lo
+    // detecta porque no hay ninguna fila hija todavía.
+    const db = openDatabase(':memory:');
+    runMigrations(db, partialMigrationsDir(2));
+    db.prepare("INSERT INTO users (telegram_user_id, timezone, created_at) VALUES (777, 'Europe/Madrid', 42)").run();
+    db.prepare('INSERT INTO workouts (user_id, started_at) VALUES (1, 100)').run();
+
+    expect(runMigrations(db, MIGRATIONS_DIR)).toHaveLength(1);
+
+    expect(db.prepare('SELECT locale, weight_unit, weight_step FROM users WHERE telegram_user_id = 777').get()).toEqual(
+      { locale: 'en', weight_unit: 'kg', weight_step: 2.5 },
+    );
+    // El workout sigue apuntando a un usuario que existe: la recreación de la
+    // tabla no puede dejar referencias colgando.
+    expect(db.prepare('SELECT user_id FROM workouts').get()).toEqual({ user_id: 1 });
+    expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
+    db.close();
+  });
+
+  it('vuelve a dejar las foreign keys activas después de migrar', () => {
+    const db = migratedDb();
+    expect(db.prepare('PRAGMA foreign_keys').get()).toEqual({ foreign_keys: 1 });
     db.close();
   });
 
