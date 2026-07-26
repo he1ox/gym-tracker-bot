@@ -6,6 +6,7 @@ import { renderActive, registerCapture } from './capture';
 import type { CustomContext } from './context';
 import { dedup } from './dedup';
 import { registerLast } from './last';
+import { preferences } from './preferences';
 import { createRestTimers } from './rest-timer';
 import { registerRoutines } from './routines-wizard';
 import { T } from './texts';
@@ -26,6 +27,9 @@ export function createBot(
 
   bot.use(dedup(db));
   bot.use(auth(db, config));
+  // Detrás de auth: lee ctx.user. Delante de todo lo demás: cualquier handler que
+  // pinte texto necesita el idioma ya fijado.
+  bot.use(preferences());
 
   // --- Todo lo que tenga callbacks propios va ANTES de registerCapture ---
   registerRoutines(bot, db, config);
