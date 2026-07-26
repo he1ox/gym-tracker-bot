@@ -15,7 +15,6 @@ import type { DatabaseSync } from 'node:sqlite';
 import { matchExercise } from '../services/exercise-match';
 import {
   adjustPending,
-  buildDayOptions,
   buildSessionView as buildView,
   finishWorkout,
   recordSet,
@@ -28,8 +27,9 @@ import { parseCallback } from './callback-data';
 import type { CustomContext } from './context';
 import { type PickerState, renderCandidates, renderNoMatch, renderPicker } from './exercise-picker';
 import type { RestTimers } from './rest-timer';
-import { renderDayPicker, renderFinishSummary, renderSession } from './session-view';
+import { renderFinishSummary, renderSession } from './session-view';
 import { T, parseErrorText } from './texts';
+import { sendWelcome } from './welcome';
 
 function isNotModified(error: unknown): boolean {
   return error instanceof GrammyError && error.description.includes('message is not modified');
@@ -169,15 +169,18 @@ async function doRecord(
   }
 }
 
-async function handleStart(ctx: CustomContext, db: DatabaseSync, restTimers: RestTimers): Promise<void> {
-  const userId = ctx.user.id;
-  const existing = getSession(db, userId);
+async function handleStart(
+  ctx: CustomContext,
+  db: DatabaseSync,
+  restTimers: RestTimers,
+  timezone: string,
+): Promise<void> {
+  const existing = getSession(db, ctx.user.id);
   if (existing) {
-    await renderActive(ctx.api, db, existing, restTimers); // reanudación
+    await renderActive(ctx.api, db, existing, restTimers); // reanudación (spec §4)
     return;
   }
-  const { text, keyboard } = renderDayPicker(buildDayOptions(db, userId));
-  await ctx.reply(text, { reply_markup: keyboard });
+  await sendWelcome(ctx, db, timezone);
 }
 
 async function handleFinish(ctx: CustomContext, db: DatabaseSync, restTimers: RestTimers): Promise<void> {
@@ -217,7 +220,23 @@ async function handleCallback(ctx: CustomContext, db: DatabaseSync, restTimers: 
 
   // Inicio de sesión: todavía no existe la fila bot_sessions.
   if (action.type === 'day' || action.type === 'free') {
-    if (getSession(db, userId)) {
+    const active = getSession(db, userId);
+    if (active) {
+      // Se llega aquí desde una bienvenida antigua: /help → ‹ Volver → ▶️ Empezar
+      // con un entreno a medias. Antes esto no hacía nada y dejaba un menú muerto.
+      // Ahora el mensaje pulsado pasa a ser EL mensaje activo de la sesión y el
+      // anterior se borra: un solo mensaje activo por sesión (SPEC §6).
+      const pressed = ctx.callbackQuery?.message?.message_id ?? null;
+      if (pressed !== null && pressed !== active.messageId) {
+        if (active.messageId !== null) {
+          await ctx.api.deleteMessage(active.chatId, active.messageId).catch(() => {});
+        }
+        updateSession(db, userId, { messageId: pressed }, now);
+      }
+      const resumed = getSession(db, userId);
+      if (resumed) {
+        await renderActive(ctx.api, db, resumed, restTimers);
+      }
       await ctx.answerCallbackQuery();
       return;
     }
@@ -442,10 +461,10 @@ async function handleText(
 export function registerCapture(
   bot: Bot<CustomContext>,
   db: DatabaseSync,
-  _config: { timezone: string },
+  config: { timezone: string },
   restTimers: RestTimers,
 ): void {
-  bot.command('start', (ctx) => handleStart(ctx, db, restTimers));
+  bot.command('start', (ctx) => handleStart(ctx, db, restTimers, config.timezone));
   bot.command('finish', (ctx) => handleFinish(ctx, db, restTimers));
   bot.on('callback_query:data', (ctx) => handleCallback(ctx, db, restTimers));
   bot.on('message:text', (ctx, next) => handleText(ctx, db, restTimers, next));

@@ -289,3 +289,146 @@ describe('exercise picker in the capture flow', () => {
     expect(getSession(d, 1)?.currentExerciseId).toBe(target.id);
   });
 });
+
+describe('welcome screen and discoverability', () => {
+  it('greets a brand-new user on /start instead of starting a workout', async () => {
+    const d = baseDb();
+    const { bot, outgoing } = makeHarness(d, BOT_INFO, CONFIG);
+
+    await bot.handleUpdate(commandUpdate(1, 'start'));
+
+    const sent = outgoing.filter((c) => c.method === 'sendMessage');
+    expect(sent).toHaveLength(1);
+    expect(String(sent[0]?.payload.text ?? '')).toContain('👋 Hola');
+    expect(sent[0]?.payload.parse_mode).toBe('HTML');
+    expect(lastKeyboardDatas(outgoing, 'sendMessage')).toEqual(['wc:s', 'wc:r', 'wc:l', 'wc:h']);
+    // No se ha creado ningún entrenamiento por saludar.
+    expect(getActiveWorkout(d, 1)).toBeUndefined();
+    expect(getSession(d, 1)).toBeUndefined();
+  });
+
+  it('repaints the active workout on /start and shows no welcome (§4)', async () => {
+    const d = baseDb();
+    const { bot, outgoing } = makeHarness(d, BOT_INFO, CONFIG);
+    await bot.handleUpdate(commandUpdate(1, 'start'));
+    await bot.handleUpdate(callbackUpdate(2, 'wc:s', MSG));
+    await bot.handleUpdate(callbackUpdate(3, 'free', MSG));
+    outgoing.length = 0;
+
+    await bot.handleUpdate(commandUpdate(4, 'start'));
+
+    const all = [...outgoingTexts(outgoing, 'sendMessage'), ...outgoingTexts(outgoing, 'editMessageText')].join('\n');
+    expect(all).not.toContain('👋 Hola');
+    expect(all).toContain('🏋️'); // la cabecera de la sesión activa
+  });
+
+  it('opens the day picker from ▶️ Empezar entrenamiento, editing the same message', async () => {
+    const d = baseDb();
+    const routine = createRoutine(d, { userId: 1, name: 'PPL', createdAt: 1 });
+    setActiveRoutine(d, { userId: 1, routineId: routine.id });
+    const day = createRoutineDay(d, { routineId: routine.id, name: 'Empuje', position: 1 });
+    const { bot, outgoing } = makeHarness(d, BOT_INFO, CONFIG);
+    await bot.handleUpdate(commandUpdate(1, 'start'));
+    outgoing.length = 0;
+
+    await bot.handleUpdate(callbackUpdate(2, 'wc:s', MSG));
+
+    expect(outgoing.filter((c) => c.method === 'sendMessage')).toHaveLength(0); // in place
+    expect(outgoingTexts(outgoing, 'editMessageText').join('\n')).toContain('¿Qué toca hoy?');
+    expect(lastKeyboardDatas(outgoing, 'editMessageText')).toEqual([`day:${day.id}`, 'free']);
+  });
+
+  it('starts the workout from a day chosen on the welcome-turned-day-picker', async () => {
+    const d = baseDb();
+    const { bot } = makeHarness(d, BOT_INFO, CONFIG);
+    await bot.handleUpdate(commandUpdate(1, 'start'));
+    await bot.handleUpdate(callbackUpdate(2, 'wc:s', MSG));
+    await bot.handleUpdate(callbackUpdate(3, 'free', MSG));
+
+    expect(getActiveWorkout(d, 1)).toBeDefined();
+    expect(getSession(d, 1)?.messageId).toBe(MSG); // el mensaje activo es ese mismo
+  });
+
+  it('opens the routines list from 📋 Mis rutinas without entering the wizard', async () => {
+    const d = baseDb();
+    createRoutine(d, { userId: 1, name: 'PPL', createdAt: 1 });
+    const { bot, outgoing } = makeHarness(d, BOT_INFO, CONFIG);
+    await bot.handleUpdate(commandUpdate(1, 'start'));
+    outgoing.length = 0;
+
+    await bot.handleUpdate(callbackUpdate(2, 'wc:r', MSG));
+
+    expect(outgoingTexts(outgoing, 'editMessageText').join('\n')).toContain('Tus rutinas');
+    expect(lastKeyboardDatas(outgoing, 'editMessageText')).toContain('newroutine');
+  });
+
+  it('opens the exercise picker with origin l from 📊 Historial', async () => {
+    const d = baseDb();
+    const { bot, outgoing } = makeHarness(d, BOT_INFO, CONFIG);
+    await bot.handleUpdate(commandUpdate(1, 'start'));
+    outgoing.length = 0;
+
+    await bot.handleUpdate(callbackUpdate(2, 'wc:l', MSG));
+
+    expect(outgoingTexts(outgoing, 'editMessageText').join('\n')).toContain('grupo muscular');
+    expect(lastKeyboardDatas(outgoing, 'editMessageText').every((x) => x.startsWith('pick:l:'))).toBe(true);
+  });
+
+  it('shows the help screen from ❓ Cómo funciona and rebuilds the welcome with ‹ Volver', async () => {
+    const d = baseDb();
+    const { bot, outgoing } = makeHarness(d, BOT_INFO, CONFIG);
+    await bot.handleUpdate(commandUpdate(1, 'start'));
+    outgoing.length = 0;
+
+    await bot.handleUpdate(callbackUpdate(2, 'wc:h', MSG));
+    expect(outgoingTexts(outgoing, 'editMessageText').join('\n')).toContain('Cómo funciona');
+    expect(lastKeyboardDatas(outgoing, 'editMessageText')).toEqual(['wc:b']);
+    expect(outgoing.filter((c) => c.method === 'sendMessage')).toHaveLength(0);
+    outgoing.length = 0;
+
+    await bot.handleUpdate(callbackUpdate(3, 'wc:b', MSG));
+    const back = outgoing.filter((c) => c.method === 'editMessageText').at(-1);
+    expect(String(back?.payload.text ?? '')).toContain('👋 Hola');
+    expect(String(back?.payload.text ?? '')).toContain('Últimos 30 días'); // resumen incluido
+    expect(lastKeyboardDatas(outgoing, 'editMessageText')).toEqual(['wc:s', 'wc:r', 'wc:l', 'wc:h']);
+  });
+
+  it('sends /help as a new message and leaves an ongoing workout untouched (§5)', async () => {
+    const d = baseDb();
+    const { bot, outgoing } = makeHarness(d, BOT_INFO, CONFIG);
+    await bot.handleUpdate(commandUpdate(1, 'start'));
+    await bot.handleUpdate(callbackUpdate(2, 'wc:s', MSG));
+    await bot.handleUpdate(callbackUpdate(3, 'free', MSG));
+    await bot.handleUpdate(callbackUpdate(4, 'ex:1', MSG));
+    const before = getSession(d, 1)!;
+    outgoing.length = 0;
+
+    await bot.handleUpdate(commandUpdate(5, 'help'));
+
+    expect(outgoingTexts(outgoing, 'sendMessage').join('\n')).toContain('Cómo funciona');
+    expect(outgoing.filter((c) => c.method === 'editMessageText')).toHaveLength(0);
+    expect(getSession(d, 1)?.messageId).toBe(before.messageId);
+    expect(getSession(d, 1)?.currentExerciseId).toBe(before.currentExerciseId);
+  });
+
+  it('resumes the workout when a day is pressed on a stale welcome (D2)', async () => {
+    const d = baseDb();
+    const { bot, outgoing } = makeHarness(d, BOT_INFO, CONFIG);
+    await bot.handleUpdate(commandUpdate(1, 'start'));
+    await bot.handleUpdate(callbackUpdate(2, 'wc:s', MSG));
+    await bot.handleUpdate(callbackUpdate(3, 'free', MSG)); // sesión activa en MSG
+    const HELP_MSG = 900; // el mensaje nuevo de /help
+    await bot.handleUpdate(commandUpdate(4, 'help'));
+    await bot.handleUpdate(callbackUpdate(5, 'wc:b', HELP_MSG)); // bienvenida en HELP_MSG
+    await bot.handleUpdate(callbackUpdate(6, 'wc:s', HELP_MSG)); // selector de día en HELP_MSG
+    outgoing.length = 0;
+
+    await bot.handleUpdate(callbackUpdate(7, 'free', HELP_MSG));
+
+    // Antes: no pasaba nada. Ahora el mensaje pulsado ES el mensaje activo.
+    expect(getSession(d, 1)?.messageId).toBe(HELP_MSG);
+    expect(outgoingTexts(outgoing, 'editMessageText').join('\n')).toContain('🏋️');
+    // Y el mensaje activo anterior se borra: un solo mensaje activo por sesión.
+    expect(outgoing.some((c) => c.method === 'deleteMessage' && c.payload.message_id === MSG)).toBe(true);
+  });
+});

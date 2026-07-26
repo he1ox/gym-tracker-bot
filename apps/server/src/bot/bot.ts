@@ -9,6 +9,7 @@ import { registerLast } from './last';
 import { createRestTimers } from './rest-timer';
 import { registerRoutines } from './routines-wizard';
 import { T } from './texts';
+import { registerWelcome } from './welcome';
 
 export interface BotDeps {
   allowedTelegramIds: number[];
@@ -26,9 +27,14 @@ export function createBot(
   bot.use(dedup(db));
   bot.use(auth(db, config));
 
-  // --- Fase 1: /routines antes de la captura; /last se añade en la Task 16 ---
+  // --- Todo lo que tenga callbacks propios va ANTES de registerCapture ---
   registerRoutines(bot, db, config);
   registerLast(bot, db, config);
+  // ANTES que registerCapture, que engancha un bot.on('callback_query:data')
+  // genérico (capture.ts): cualquier handler de wc:* registrado después nunca se
+  // ejecutaría. Es la misma trampa que obligó a meter el segmento de origen en el
+  // espacio pick: (ver el comentario de callback-data.ts).
+  registerWelcome(bot, db, config);
 
   const restTimers = createRestTimers({
     send: async (chatId, text) => (await bot.api.sendMessage(chatId, text)).message_id,

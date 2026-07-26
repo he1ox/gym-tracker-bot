@@ -1,7 +1,14 @@
 import type { Overview } from '@gym-tracker/core';
-import { InlineKeyboard } from 'grammy';
+import { listExercisesByMuscleGroup } from '@gym-tracker/db';
+import { type Bot, InlineKeyboard } from 'grammy';
+import type { DatabaseSync } from 'node:sqlite';
+import { buildUserOverview } from '../services/overview-service';
+import { buildDayOptions } from '../services/session-service';
 import { CB } from './callback-data';
-import { formatTonnage, formatWeight } from './session-view';
+import type { CustomContext } from './context';
+import { renderPicker } from './exercise-picker';
+import { renderRoutinesList } from './routines-wizard';
+import { formatTonnage, formatWeight, renderDayPicker } from './session-view';
 import { T } from './texts';
 
 export interface WelcomeModel {
@@ -99,4 +106,74 @@ export function renderWelcome(model: WelcomeModel): Rendered {
 
 export function renderHelp(): Rendered {
   return { text: T.helpText, keyboard: new InlineKeyboard().text(T.welcomeBackButton, CB.wcBack) };
+}
+
+// parse_mode va en TODOS los envíos de estas dos pantallas: la tabla de métricas
+// necesita <pre> y la ayuda usa <code> para los ejemplos.
+const HTML = { parse_mode: 'HTML' } as const;
+
+export function welcomeModel(db: DatabaseSync, ctx: CustomContext, timezone: string): WelcomeModel {
+  const firstName = ctx.from?.first_name?.trim();
+  return {
+    firstName: firstName === undefined || firstName === '' ? null : firstName,
+    overview: buildUserOverview(db, { userId: ctx.user.id, timezone, now: Date.now() }),
+  };
+}
+
+/** `/start` sin sesión activa: mensaje nuevo. */
+export async function sendWelcome(ctx: CustomContext, db: DatabaseSync, timezone: string): Promise<void> {
+  const { text, keyboard } = renderWelcome(welcomeModel(db, ctx, timezone));
+  await ctx.reply(text, { reply_markup: keyboard, ...HTML });
+}
+
+export function registerWelcome(
+  bot: Bot<CustomContext>,
+  db: DatabaseSync,
+  config: { timezone: string },
+): void {
+  // Todas las pantallas de aquí editan el mensaje pulsado. El .catch silencia los
+  // "message is not modified" y los mensajes ya inaccesibles, igual que last.ts.
+  const edit = async (ctx: CustomContext, rendered: Rendered, html: boolean): Promise<void> => {
+    await ctx
+      .editMessageText(rendered.text, { reply_markup: rendered.keyboard, ...(html ? HTML : {}) })
+      .catch(() => {});
+  };
+
+  bot.command('help', async (ctx) => {
+    // Mensaje NUEVO: /help funciona con un entrenamiento en curso y no debe tocar
+    // el mensaje activo de la sesión (spec §5).
+    const { text, keyboard } = renderHelp();
+    await ctx.reply(text, { reply_markup: keyboard, ...HTML });
+  });
+
+  bot.callbackQuery(CB.wcHelp, async (ctx) => {
+    await edit(ctx, renderHelp(), true);
+    await ctx.answerCallbackQuery();
+  });
+
+  // ‹ Volver reconstruye la bienvenida EN EL SITIO, venga de donde venga: no
+  // depende de si a la ayuda se llegó por botón o por /help (spec §5).
+  bot.callbackQuery(CB.wcBack, async (ctx) => {
+    await edit(ctx, renderWelcome(welcomeModel(db, ctx, config.timezone)), true);
+    await ctx.answerCallbackQuery();
+  });
+
+  bot.callbackQuery(CB.wcStart, async (ctx) => {
+    await edit(ctx, renderDayPicker(buildDayOptions(db, ctx.user.id)), false);
+    await ctx.answerCallbackQuery();
+  });
+
+  bot.callbackQuery(CB.wcRoutines, async (ctx) => {
+    // Pinta la lista sin entrar en la conversación: su botón "➕ Nueva rutina" ya
+    // hace conversation.enter por su cuenta (spec §7).
+    await edit(ctx, renderRoutinesList(db, ctx.user.id), false);
+    await ctx.answerCallbackQuery();
+  });
+
+  bot.callbackQuery(CB.wcHistory, async (ctx) => {
+    // Origen 'l': sus callbacks los atiende last.ts:96, registrado antes que esto.
+    const picker = renderPicker({ view: 'groups' }, 'l', listExercisesByMuscleGroup(db, ctx.user.id));
+    await edit(ctx, picker, false);
+    await ctx.answerCallbackQuery();
+  });
 }
