@@ -96,3 +96,19 @@ Registro del porqué. El qué vive en `SPEC.md`; el diseño de cada fase en `doc
   tarjetas de estancamiento muestran el dato medido: semanas sin superar el máximo previo.
 - **`@testing-library/jest-dom` descartada.** Los asserts se escriben con las utilidades de
   Vitest sobre el DOM real; una dependencia menos por azúcar sintáctico.
+
+## 2026-07-26 — Gráficas en el bot
+
+- **Chart.js sobre skia-canvas para rasterizar las gráficas del bot.** Telegram no renderiza SVG
+  dentro de un mensaje: solo imágenes rasterizadas enviadas como foto. Descartadas:
+  `@resvg/resvg-js` (mismo coste de módulo nativo y habría que escribir las gráficas a mano otra
+  vez), generar el PNG a mano con `node:zlib` (semanas de trabajo para peor resultado) y usar
+  bloques Unicode como sustituto total del raster (no da ejes, escalas ni series temporales).
+  Contrapartidas asumidas: contradice el SPEC §3 original (por eso el SPEC se edita, no se
+  ignora), el árbol crece decenas de MB, y la Fase 4 no podrá empaquetar un binario
+  autocontenido sin arrastrar el `.node`. Versiones instaladas: chart.js 4.5.1, skia-canvas
+  3.0.8. Binario para musl: sí — existen `linux-x64-musl.gz` y `linux-arm64-musl.gz` en los
+  releases de GitHub de skia-canvas (comprobado contra la v3.0.8, HTTP 302 hacia el asset real
+  frente a 404 de un nombre inventado). La imagen Docker de la Fase 4 puede basarse en Alpine;
+  queda pendiente de esa fase comprobar que las fuentes del sistema (`fonts.conf` no trae
+  ninguna) están disponibles también ahí.

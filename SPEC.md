@@ -66,7 +66,7 @@ violando la arquitectura.
 | ORM y migraciones | Drizzle ORM + Drizzle Kit |
 | Frontend | Vite + React + TypeScript |
 | Estilos | CSS plano con custom properties (sistema de diseño Nocturne) |
-| Gráficas | SVG escrito a mano |
+| Gráficas | SVG escrito a mano en el dashboard; Chart.js sobre skia-canvas en el bot |
 | Enrutado del dashboard | router propio sobre `hashchange` |
 | Tests | Vitest + Testing Library |
 | Monorepo | pnpm workspaces |
@@ -75,8 +75,11 @@ Las tres filas de estilos, gráficas y enrutado se apartan de la intención orig
 (Tailwind + shadcn/ui, Recharts, `react-router`). El motivo y la contrapartida de cada una
 están en `DECISIONS.md`.
 
-**Prohibido usar `better-sqlite3`** ni cualquier otro módulo nativo que requiera compilación
-en la máquina del usuario: rompe las instalaciones de quien no tiene compilador.
+**Prohibido usar `better-sqlite3`** ni cualquier otro módulo nativo que **exija un compilador**
+en la máquina del usuario: rompe las instalaciones de quien no lo tiene. Sí se admiten módulos
+nativos que distribuyan **binarios precompilados por plataforma** y no compilen nada al
+instalarse; `skia-canvas`, que rasteriza las gráficas del bot, entra por esa puerta
+(ver `DECISIONS.md`).
 
 ### Estructura del repositorio
 

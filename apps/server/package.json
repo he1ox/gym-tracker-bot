@@ -11,8 +11,10 @@
     "@grammyjs/conversations": "^2.1.1",
     "@gym-tracker/core": "workspace:*",
     "@gym-tracker/db": "workspace:*",
+    "chart.js": "^4.5.1",
     "grammy": "^1.45.1",
-    "i18next": "^26.3.6"
+    "i18next": "^26.3.6",
+    "skia-canvas": "^3.0.8"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
