@@ -29,7 +29,7 @@ const MSG = 500; // message_id estable del mensaje activo en los callbacks
 function baseDb() {
   const d = openDatabase(':memory:');
   runMigrations(d, MIGRATIONS_DIR);
-  createUser(d, { telegramUserId: 111, timezone: 'UTC', createdAt: 0 });
+  createUser(d, { telegramUserId: 111, timezone: 'UTC', locale: 'es', createdAt: 0 });
   return d;
 }
 

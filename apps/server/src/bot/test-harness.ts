@@ -1,5 +1,7 @@
 import type { Bot } from 'grammy';
 import type { DatabaseSync } from 'node:sqlite';
+import { setCurrent } from '../i18n/current';
+import { initI18n } from '../i18n/index';
 import { createBot } from './bot';
 import type { CustomContext } from './context';
 
@@ -27,6 +29,9 @@ export function makeHarness(
   config: { allowedTelegramIds: number[]; timezone: string },
   failOn?: string,
 ): { bot: Bot<CustomContext>; outgoing: OutgoingCall[] } {
+  // Estado por defecto para los renders que se invocan fuera de un update.
+  initI18n();
+  setCurrent({ locale: 'es', unit: 'kg', step: 2.5 });
   const bot = createBot('TEST:TOKEN', db, config, botInfo as never);
   const outgoing: OutgoingCall[] = [];
   let seq = 1000;
@@ -72,7 +77,9 @@ export function textUpdate(updateId: number, text: string, fromId = 111): AnyUpd
       message_id: updateId * 10,
       date: 0,
       chat: privateChat(fromId),
-      from: { id: fromId, is_bot: false, first_name: 'U' },
+      // language_code: los tests existentes se escribieron contra los textos en
+      // español, y es este campo —no setCurrent— el que decide el idioma del alta.
+      from: { id: fromId, is_bot: false, first_name: 'U', language_code: 'es' },
       text,
       ...(isCommand ? { entities: [{ type: 'bot_command', offset: 0, length: text.split(' ')[0]?.length ?? text.length }] } : {}),
     },
@@ -100,7 +107,7 @@ export function callbackUpdate(updateId: number, data: string, messageId: number
     update_id: updateId,
     callback_query: {
       id: String(updateId),
-      from: { id: fromId, is_bot: false, first_name: 'U' },
+      from: { id: fromId, is_bot: false, first_name: 'U', language_code: 'es' },
       chat_instance: 'ci',
       data,
       message: {

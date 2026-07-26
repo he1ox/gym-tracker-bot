@@ -1,8 +1,18 @@
 import type { Overview } from '@gym-tracker/core';
 import { MIGRATIONS_DIR, createUser, openDatabase, runMigrations } from '@gym-tracker/db';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { setCurrent } from '../i18n/current';
+import { initI18n } from '../i18n/index';
 import { BOT_INFO, makeHarness } from './test-harness';
 import { escapeHtml, renderHelp, renderWelcome, setBotCommands } from './welcome';
+
+// Los renders leen el idioma del estado global; estos tests no pasan por el
+// middleware de preferencias, así que lo fijan a mano.
+beforeAll(() => {
+  initI18n();
+  setCurrent({ locale: 'es', unit: 'kg', step: 2.5 });
+});
+
 
 function metric(current: number, previous: number, changePercent: number | null) {
   return { current, previous, changePercent };
@@ -152,7 +162,7 @@ describe('setBotCommands', () => {
   it('registers exactly the five commands of the spec, in order', async () => {
     const d = openDatabase(':memory:');
     runMigrations(d, MIGRATIONS_DIR);
-    createUser(d, { telegramUserId: 111, timezone: 'UTC', createdAt: 0 });
+    createUser(d, { telegramUserId: 111, timezone: 'UTC', locale: 'es', createdAt: 0 });
     const { bot, outgoing } = makeHarness(d, BOT_INFO, { allowedTelegramIds: [111], timezone: 'UTC' });
 
     await setBotCommands(bot.api);

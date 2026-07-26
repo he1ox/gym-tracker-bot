@@ -23,7 +23,7 @@ const CONFIG = { allowedTelegramIds: [111], timezone: 'UTC' };
 function db() {
   const d = openDatabase(':memory:');
   runMigrations(d, MIGRATIONS_DIR);
-  createUser(d, { telegramUserId: 111, timezone: 'UTC', createdAt: 0 });
+  createUser(d, { telegramUserId: 111, timezone: 'UTC', locale: 'es', createdAt: 0 });
   return d;
 }
 

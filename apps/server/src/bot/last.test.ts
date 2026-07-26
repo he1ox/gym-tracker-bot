@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { setCurrent } from '../i18n/current';
+import { initI18n } from '../i18n/index';
 import { MUSCLE_GROUPS } from '@gym-tracker/core';
 import {
   MIGRATIONS_DIR,
@@ -14,6 +16,14 @@ import {
 import { renderLast } from './last';
 import { BOT_INFO, callbackUpdate, commandUpdate, lastKeyboardDatas, makeHarness, outgoingTexts, textUpdate } from './test-harness';
 
+// Los renders leen el idioma del estado global; estos tests no pasan por el
+// middleware de preferencias, así que lo fijan a mano.
+beforeAll(() => {
+  initI18n();
+  setCurrent({ locale: 'es', unit: 'kg', step: 2.5 });
+});
+
+
 const CONFIG = { allowedTelegramIds: [111], timezone: 'UTC' };
 const LAST_MSG = 800;
 
@@ -22,7 +32,7 @@ const EX = 1;
 function db() {
   const d = openDatabase(':memory:');
   runMigrations(d, MIGRATIONS_DIR);
-  createUser(d, { telegramUserId: 111, timezone: 'UTC', createdAt: 0 });
+  createUser(d, { telegramUserId: 111, timezone: 'UTC', locale: 'es', createdAt: 0 });
   return d;
 }
 

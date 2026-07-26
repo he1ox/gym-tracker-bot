@@ -118,13 +118,15 @@ export function renderFinishSummary(summary: FinishSummary): string {
   const title = summary.dayName ?? T.freeWorkoutTitle;
   const lines = [
     T.finishTitle,
-    `${title} · ${T.setsSummary(summary.effectiveSets)} · ${formatTonnage(
-      summary.tonnageKg,
-    )} kg · ${summary.durationMinutes} min`,
+    `${title} · ${T.setsSummary(summary.effectiveSets)} · ${T.withUnit(
+      formatTonnage(summary.tonnageKg),
+    )} · ${summary.durationMinutes} min`,
   ];
   for (const rec of summary.records) {
     const previous = rec.previous1RM === null ? '' : T.previousRecord(format1RM(rec.previous1RM));
-    lines.push(`${T.recordIcon} ${rec.exerciseName}: ${format1RM(rec.estimated1RM)} kg ${T.estimatedRecordLabel}${previous}`);
+    lines.push(
+      `${T.recordIcon} ${rec.exerciseName}: ${T.withUnit(format1RM(rec.estimated1RM))} ${T.estimatedRecordLabel}${previous}`,
+    );
   }
   return lines.join('\n');
 }

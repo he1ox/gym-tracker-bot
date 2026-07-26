@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { setCurrent } from '../i18n/current';
+import { initI18n } from '../i18n/index';
 import type { InlineKeyboard } from 'grammy';
 import { CB } from './callback-data';
 import {
@@ -8,6 +10,14 @@ import {
   renderSession,
   type SessionViewModel,
 } from './session-view';
+
+// Los renders leen el idioma del estado global; estos tests no pasan por el
+// middleware de preferencias, así que lo fijan a mano.
+beforeAll(() => {
+  initI18n();
+  setCurrent({ locale: 'es', unit: 'kg', step: 2.5 });
+});
+
 
 function datas(kb: InlineKeyboard): string[] {
   return kb.inline_keyboard.flat().map((b) => (b && 'callback_data' in b ? b.callback_data ?? '' : ''));

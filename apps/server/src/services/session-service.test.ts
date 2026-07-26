@@ -26,7 +26,7 @@ const EX = 1; // ejercicio 1 del catálogo seed
 function db() {
   const d = openDatabase(':memory:');
   runMigrations(d, MIGRATIONS_DIR);
-  createUser(d, { telegramUserId: 111, timezone: 'UTC', createdAt: 0 });
+  createUser(d, { telegramUserId: 111, timezone: 'UTC', locale: 'es', createdAt: 0 });
   return d;
 }
 

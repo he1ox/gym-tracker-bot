@@ -19,7 +19,7 @@ const TODAY_START = Date.UTC(2026, 6, 25, 6, 0);
 function baseDb() {
   const d = openDatabase(':memory:');
   runMigrations(d, MIGRATIONS_DIR);
-  createUser(d, { telegramUserId: 111, timezone: TZ, createdAt: 0 });
+  createUser(d, { telegramUserId: 111, timezone: TZ, locale: 'es', createdAt: 0 });
   return d;
 }
 

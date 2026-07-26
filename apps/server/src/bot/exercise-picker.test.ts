@@ -1,10 +1,20 @@
 import { MUSCLE_GROUPS, MUSCLE_GROUP_LABELS, type MuscleGroup } from '@gym-tracker/core';
 import type { ExerciseOption } from '@gym-tracker/db';
 import type { InlineKeyboard } from 'grammy';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { setCurrent } from '../i18n/current';
+import { initI18n } from '../i18n/index';
 import { CB } from './callback-data';
 import { PICKER_PAGE_SIZE, renderCandidates, renderNoMatch, renderPicker } from './exercise-picker';
 import { T } from './texts';
+
+// Los renders leen el idioma del estado global; estos tests no pasan por el
+// middleware de preferencias, así que lo fijan a mano.
+beforeAll(() => {
+  initI18n();
+  setCurrent({ locale: 'es', unit: 'kg', step: 2.5 });
+});
+
 
 // Aplana el teclado a sus callback_data, en orden de lectura.
 function datas(kb: InlineKeyboard): string[] {
