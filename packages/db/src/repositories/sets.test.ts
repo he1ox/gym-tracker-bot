@@ -124,12 +124,10 @@ describe('listEffectiveSetsBetween', () => {
   });
 
   it('trae el grupo muscular de cada serie efectiva', () => {
-    const d = openDatabase(':memory:');
-    runMigrations(d, MIGRATIONS_DIR);
-    createUser(d, { telegramUserId: 111, timezone: 'UTC', locale: 'es', createdAt: 0 });
+    const d = db();
     const w = createWorkout(d, { userId: 1, routineDayId: null, dayNameSnapshot: null, startedAt: 0 });
-    const exercise = getExerciseById(d, 1)!;
-    insertSet(d, { workoutId: w.id, exerciseId: exercise.id, position: 1, weightKg: 60, reps: 8, rpe: null, restSeconds: null, isWarmup: false, createdAt: 1_000 });
+    const exercise = getExerciseById(d, EX)!;
+    add(d, w.id, { createdAt: 1_000 });
 
     const rows = listEffectiveSetsBetween(d, { userId: 1, fromMs: 0, toMs: 2_000 });
 
@@ -141,16 +139,14 @@ describe('listEffectiveSetsBetween', () => {
   });
 
   it('incluye las series de un ejercicio archivado, con su grupo', () => {
-    const d = openDatabase(':memory:');
-    runMigrations(d, MIGRATIONS_DIR);
-    createUser(d, { telegramUserId: 111, timezone: 'UTC', locale: 'es', createdAt: 0 });
+    const d = db();
     const w = createWorkout(d, { userId: 1, routineDayId: null, dayNameSnapshot: null, startedAt: 0 });
-    insertSet(d, { workoutId: w.id, exerciseId: 1, position: 1, weightKg: 60, reps: 8, rpe: null, restSeconds: null, isWarmup: false, createdAt: 1_000 });
-    d.prepare('UPDATE exercises SET archived = 1 WHERE id = 1').run();
+    add(d, w.id, { createdAt: 1_000 });
+    d.prepare('UPDATE exercises SET archived = 1 WHERE id = ?').run(EX);
 
     const rows = listEffectiveSetsBetween(d, { userId: 1, fromMs: 0, toMs: 2_000 });
 
     expect(rows).toHaveLength(1);
-    expect(rows[0]?.muscleGroup).toBe(getExerciseById(d, 1)!.muscleGroup);
+    expect(rows[0]?.muscleGroup).toBe(getExerciseById(d, EX)!.muscleGroup);
   });
 });
