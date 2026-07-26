@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite';
+import type { MuscleGroup } from '@gym-tracker/core';
 
 export interface SetRow {
   id: number;
@@ -117,18 +118,27 @@ export function listHistorySetsForExercise(
   return rows.map(mapSet);
 }
 
-/** Misma forma que `OverviewSet` de `@gym-tracker/core`, para pasarlo sin mapear. */
+/**
+ * Superconjunto de `OverviewSet` de `@gym-tracker/core`, para pasarlo sin mapear:
+ * `buildOverview` ignora `muscleGroup` y el bot lo usa para agrupar por músculo.
+ */
 export interface EffectiveSetWithName {
   createdAt: number;
   weightKg: number;
   reps: number;
   exerciseName: string;
+  muscleGroup: MuscleGroup;
 }
 
 /**
  * Series efectivas (`is_warmup = 0`) del usuario en `[fromMs, toMs]`, ambos
- * inclusive, con el nombre del ejercicio ya unido. Se pide una sola vez sobre los
- * 60 días completos; el reparto entre ventanas lo hace `buildOverview`.
+ * inclusive, con el nombre y el grupo muscular del ejercicio ya unidos. Se pide una
+ * sola vez sobre los 60 días completos; el reparto entre ventanas lo hace
+ * `buildOverview` y el agrupamiento por músculo, `weeklyGroupCounts`.
+ *
+ * El grupo sale del propio JOIN, no de un mapa de ejercicios activos: así las
+ * series de un ejercicio archivado siguen contando y no hay forma de que falte
+ * la clave de un ejercicio.
  */
 export function listEffectiveSetsBetween(
   db: DatabaseSync,
@@ -136,7 +146,7 @@ export function listEffectiveSetsBetween(
 ): EffectiveSetWithName[] {
   const rows = db
     .prepare(
-      `SELECT s.created_at, s.weight_kg, s.reps, e.name AS exercise_name
+      `SELECT s.created_at, s.weight_kg, s.reps, e.name AS exercise_name, e.muscle_group AS muscle_group
          FROM sets s
          JOIN workouts w ON w.id = s.workout_id
          JOIN exercises e ON e.id = s.exercise_id
@@ -148,11 +158,13 @@ export function listEffectiveSetsBetween(
     weight_kg: number;
     reps: number;
     exercise_name: string;
+    muscle_group: MuscleGroup;
   }>;
   return rows.map((r) => ({
     createdAt: r.created_at,
     weightKg: r.weight_kg,
     reps: r.reps,
     exerciseName: r.exercise_name,
+    muscleGroup: r.muscle_group,
   }));
 }

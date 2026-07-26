@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MIGRATIONS_DIR, openDatabase, runMigrations } from '../index';
 import { createUser } from './users';
 import { createWorkout, finishWorkout } from './workouts';
-import { createCustomExercise } from './exercises';
+import { createCustomExercise, getExerciseById } from './exercises';
 import {
   insertSet,
   lastEffectiveSetForExercise,
@@ -121,5 +121,36 @@ describe('listEffectiveSetsBetween', () => {
 
     const rows = listEffectiveSetsBetween(d, { userId: 1, fromMs: 0, toMs: 9999 });
     expect(rows[0]?.exerciseName).toBe('Curl <martillo> & polea');
+  });
+
+  it('trae el grupo muscular de cada serie efectiva', () => {
+    const d = openDatabase(':memory:');
+    runMigrations(d, MIGRATIONS_DIR);
+    createUser(d, { telegramUserId: 111, timezone: 'UTC', locale: 'es', createdAt: 0 });
+    const w = createWorkout(d, { userId: 1, routineDayId: null, dayNameSnapshot: null, startedAt: 0 });
+    const exercise = getExerciseById(d, 1)!;
+    insertSet(d, { workoutId: w.id, exerciseId: exercise.id, position: 1, weightKg: 60, reps: 8, rpe: null, restSeconds: null, isWarmup: false, createdAt: 1_000 });
+
+    const rows = listEffectiveSetsBetween(d, { userId: 1, fromMs: 0, toMs: 2_000 });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.muscleGroup).toBe(exercise.muscleGroup);
+    // El resto del contrato no cambia: buildOverview sigue recibiendo lo mismo.
+    expect(rows[0]?.exerciseName).toBe(exercise.name);
+    expect(rows[0]?.weightKg).toBe(60);
+  });
+
+  it('incluye las series de un ejercicio archivado, con su grupo', () => {
+    const d = openDatabase(':memory:');
+    runMigrations(d, MIGRATIONS_DIR);
+    createUser(d, { telegramUserId: 111, timezone: 'UTC', locale: 'es', createdAt: 0 });
+    const w = createWorkout(d, { userId: 1, routineDayId: null, dayNameSnapshot: null, startedAt: 0 });
+    insertSet(d, { workoutId: w.id, exerciseId: 1, position: 1, weightKg: 60, reps: 8, rpe: null, restSeconds: null, isWarmup: false, createdAt: 1_000 });
+    d.prepare('UPDATE exercises SET archived = 1 WHERE id = 1').run();
+
+    const rows = listEffectiveSetsBetween(d, { userId: 1, fromMs: 0, toMs: 2_000 });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.muscleGroup).toBe(getExerciseById(d, 1)!.muscleGroup);
   });
 });
