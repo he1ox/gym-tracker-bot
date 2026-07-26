@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MUSCLE_GROUPS } from '@gym-tracker/core';
 import {
   MIGRATIONS_DIR,
+  createRoutine,
   createUser,
   getExerciseById,
   listCatalogAndOwn,
@@ -11,8 +12,11 @@ import {
   listRoutines,
   openDatabase,
   runMigrations,
+  setActiveRoutine,
 } from '@gym-tracker/db';
 import { makeHarness, callbackUpdate, outgoingTexts, textUpdate, BOT_INFO } from './test-harness';
+import { renderRoutinesList } from './routines-wizard';
+import { T } from './texts';
 
 const CONFIG = { allowedTelegramIds: [111], timezone: 'UTC' };
 
@@ -217,5 +221,28 @@ describe('/routines wizard with the exercise picker', () => {
 
     const days = listRoutineDays(d, listRoutines(d, 1)[0]!.id);
     expect(listRoutineExerciseDetails(d, days[0]!.id)).toHaveLength(0);
+  });
+});
+
+describe('renderRoutinesList', () => {
+  it('lists the routines with the active one marked and offers the new-routine button', () => {
+    const d = db();
+    const first = createRoutine(d, { userId: 1, name: 'PPL', createdAt: 1 });
+    createRoutine(d, { userId: 1, name: 'Full body', createdAt: 2 });
+    setActiveRoutine(d, { userId: 1, routineId: first.id });
+
+    const { text, keyboard } = renderRoutinesList(d, 1);
+    const datas = keyboard.inline_keyboard.flat().map((b) => ('callback_data' in b ? b.callback_data : ''));
+
+    expect(text).toBe(T.routinesList);
+    expect(datas).toEqual([`setactive:${first.id}`, 'setactive:2', 'newroutine']);
+    expect(JSON.stringify(keyboard.inline_keyboard)).toContain('✅ PPL');
+  });
+
+  it('says there are none yet but still offers to create one', () => {
+    const d = db();
+    const { text, keyboard } = renderRoutinesList(d, 1);
+    expect(text).toBe(T.noRoutines);
+    expect(keyboard.inline_keyboard.flat()).toHaveLength(1);
   });
 });

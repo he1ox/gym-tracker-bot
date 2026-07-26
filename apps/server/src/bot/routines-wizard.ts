@@ -292,6 +292,25 @@ async function createOwnExercise(
   return created.id;
 }
 
+/**
+ * Lista de rutinas con la activa marcada. Extraída del handler de /routines para
+ * que la bienvenida (welcome.ts, botón "📋 Mis rutinas") pinte exactamente lo
+ * mismo sin entrar en la conversación del wizard: su botón "➕ Nueva rutina" ya
+ * hace conversation.enter('routineWizard') por su cuenta.
+ */
+export function renderRoutinesList(
+  db: DatabaseSync,
+  userId: number,
+): { text: string; keyboard: InlineKeyboard } {
+  const routines = listRoutines(db, userId);
+  const keyboard = new InlineKeyboard();
+  for (const routine of routines) {
+    keyboard.text(`${routine.isActive ? '✅ ' : ''}${routine.name}`, `setactive:${routine.id}`).row();
+  }
+  keyboard.text(T.newRoutineButton, 'newroutine');
+  return { text: routines.length > 0 ? T.routinesList : T.noRoutines, keyboard };
+}
+
 export function registerRoutines(bot: Bot<CustomContext>, db: DatabaseSync, _config: unknown): void {
   bot.use(conversations());
   bot.use(
@@ -316,13 +335,8 @@ export function registerRoutines(bot: Bot<CustomContext>, db: DatabaseSync, _con
   );
 
   bot.command('routines', async (ctx) => {
-    const routines = listRoutines(db, ctx.user.id);
-    const kb = new InlineKeyboard();
-    for (const routine of routines) {
-      kb.text(`${routine.isActive ? '✅ ' : ''}${routine.name}`, `setactive:${routine.id}`).row();
-    }
-    kb.text(T.newRoutineButton, 'newroutine');
-    await ctx.reply(routines.length > 0 ? T.routinesList : T.noRoutines, { reply_markup: kb });
+    const { text, keyboard } = renderRoutinesList(db, ctx.user.id);
+    await ctx.reply(text, { reply_markup: keyboard });
   });
 
   bot.callbackQuery('newroutine', async (ctx) => {

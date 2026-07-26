@@ -1,14 +1,12 @@
 import { parseSetInput } from '@gym-tracker/core';
 import {
   type BotSessionRow,
-  getActiveRoutine,
   getExerciseById,
   getRoutineDayById,
   getSession,
   getWorkoutById,
   listCatalogAndOwn,
   listExercisesByMuscleGroup,
-  listRoutineDays,
   listRoutineExerciseDetails,
   updateSession,
 } from '@gym-tracker/db';
@@ -17,6 +15,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { matchExercise } from '../services/exercise-match';
 import {
   adjustPending,
+  buildDayOptions,
   buildSessionView as buildView,
   finishWorkout,
   recordSet,
@@ -177,11 +176,7 @@ async function handleStart(ctx: CustomContext, db: DatabaseSync, restTimers: Res
     await renderActive(ctx.api, db, existing, restTimers); // reanudación
     return;
   }
-  const active = getActiveRoutine(db, userId);
-  const days = active
-    ? listRoutineDays(db, active.id).map((d) => ({ routineDayId: d.id, name: d.name }))
-    : [];
-  const { text, keyboard } = renderDayPicker(days);
+  const { text, keyboard } = renderDayPicker(buildDayOptions(db, userId));
   await ctx.reply(text, { reply_markup: keyboard });
 }
 

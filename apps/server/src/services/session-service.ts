@@ -6,12 +6,14 @@ import {
   createWorkout,
   deleteSession,
   finishWorkout as closeWorkout,
+  getActiveRoutine,
   getExerciseById,
   getSession,
   getWorkoutById,
   insertSet,
   lastEffectiveSetForExercise,
   listHistorySetsForExercise,
+  listRoutineDays,
   listRoutineExerciseDetails,
   listSetsForWorkout,
   listSetsForWorkoutExercise,
@@ -20,6 +22,7 @@ import {
 } from '@gym-tracker/db';
 import type { DatabaseSync } from 'node:sqlite';
 import type {
+  DayOption,
   DisplaySet,
   ExercisePickItem,
   FinishSummary,
@@ -177,6 +180,16 @@ function buildPickItems(db: DatabaseSync, session: BotSessionRow): ExercisePickI
     }
   }
   return items;
+}
+
+/**
+ * Días de la rutina activa del usuario, o lista vacía si no tiene ninguna activa.
+ * Vive aquí y no en capture.ts para que welcome.ts pueda usarla sin crear un ciclo
+ * de importación (capture.ts importa welcome.ts).
+ */
+export function buildDayOptions(db: DatabaseSync, userId: number): DayOption[] {
+  const active = getActiveRoutine(db, userId);
+  return active ? listRoutineDays(db, active.id).map((d) => ({ routineDayId: d.id, name: d.name })) : [];
 }
 
 export function buildSessionView(db: DatabaseSync, session: BotSessionRow): SessionViewModel {
