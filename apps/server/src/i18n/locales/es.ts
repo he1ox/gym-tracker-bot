@@ -74,6 +74,10 @@ export const es = {
     lastNoHistory: 'Todavía no tienes series de {{name}}.',
     lastHeader: '📊 {{name}} — últimas sesiones',
     lastBest: 'Mejor 1RM estimado: {{weight}} {{unit}}',
+    lastChartButton: '📈 Ver gráfica',
+    lastStagnant_one: '⚠️ {{count}} semana sin superar {{weight}} {{unit}}',
+    lastStagnant_other: '⚠️ {{count}} semanas sin superar {{weight}} {{unit}}',
+    chartExerciseCaption: '📈 {{name}} · mejor 1RM {{weight}} {{unit}}',
 
     // Selector de ejercicios por grupo muscular
     pickChooseGroup: 'Elige un grupo muscular:',

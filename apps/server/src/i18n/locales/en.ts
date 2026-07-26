@@ -62,6 +62,10 @@ export const en = {
     lastNoHistory: 'You have no sets for {{name}} yet.',
     lastHeader: '📊 {{name}} — recent sessions',
     lastBest: 'Best estimated 1RM: {{weight}} {{unit}}',
+    lastChartButton: '📈 View chart',
+    lastStagnant_one: '⚠️ {{count}} week without beating {{weight}} {{unit}}',
+    lastStagnant_other: '⚠️ {{count}} weeks without beating {{weight}} {{unit}}',
+    chartExerciseCaption: '📈 {{name}} · best 1RM {{weight}} {{unit}}',
 
     pickChooseGroup: 'Pick a muscle group:',
     pickSearchButton: '🔍 Search by name',

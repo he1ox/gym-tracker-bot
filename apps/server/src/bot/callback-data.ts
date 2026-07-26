@@ -43,6 +43,10 @@ export const CB = {
   setLocale: (locale: string): string => `set:l:${locale}`,
   setUnit: (unit: string): string => `set:u:${unit}`,
   setStep: (step: number): string => `set:s:${step}`,
+  // Espacio de la gráfica de /last. Como wc:* y set:*, NO pasa por parseCallback:
+  // su handler usa un filtro por expresión regular y se registra en registerLast,
+  // antes del catch-all de capture.ts.
+  chart: (exerciseId: number): string => `ch:${exerciseId}`,
 } as const;
 
 export type CallbackAction =

@@ -1,4 +1,4 @@
-import { session1RM } from '@gym-tracker/core';
+import { detectStagnation, session1RM } from '@gym-tracker/core';
 import {
   type SetRow,
   getExerciseById,
@@ -6,26 +6,41 @@ import {
   listExercisesByMuscleGroup,
   listHistorySetsForExercise,
 } from '@gym-tracker/db';
-import { type Bot, InlineKeyboard } from 'grammy';
+import { type Bot, InlineKeyboard, InputFile } from 'grammy';
 import type { DatabaseSync } from 'node:sqlite';
+import { exercise1RMChart } from '../charts/exercise-1rm';
+import { renderChart } from '../charts/render';
+import { currentLocale, unitLabel } from '../i18n/current';
 import { displayName, localizeGroups } from '../i18n/exercise-name';
 import { matchExercise } from '../services/exercise-match';
-import { parseCallback } from './callback-data';
+import { sessionSeries } from '../services/exercise-sessions';
+import { CB, parseCallback } from './callback-data';
 import type { CustomContext } from './context';
 import { type PickerState, renderCandidates, renderNoMatch, renderPicker } from './exercise-picker';
 import { format1RM, formatSet } from './session-view';
 import { T } from './texts';
 
+// El idioma activo, no un 'es-ES' fijo: el eje de fechas de la gráfica y estas
+// líneas tienen que hablar el idioma del usuario.
 function localDate(epochMs: number, timeZone: string): string {
-  return new Intl.DateTimeFormat('es-ES', { timeZone, day: '2-digit', month: '2-digit', year: 'numeric' }).format(
-    new Date(epochMs),
-  );
+  return new Intl.DateTimeFormat(currentLocale(), {
+    timeZone,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(epochMs));
+}
+
+export interface LastDetail {
+  text: string;
+  /** Sesiones con al menos una serie efectiva: con menos de dos no hay gráfica. */
+  sessions: number;
 }
 
 export function renderLast(
   db: DatabaseSync,
   params: { userId: number; exerciseId: number; timezone: string },
-): string {
+): LastDetail {
   const exercise = getExerciseById(db, params.exerciseId);
   const name = exercise ? displayName(exercise) : '';
   // excludeWorkoutId: 0 no excluye ninguno (ningún workout tiene id 0) → todo el histórico.
@@ -35,7 +50,7 @@ export function renderLast(
     excludeWorkoutId: 0,
   });
   if (sets.length === 0) {
-    return T.lastNoHistory(name);
+    return { text: T.lastNoHistory(name), sessions: 0 };
   }
 
   const byWorkout = new Map<number, SetRow[]>();
@@ -62,7 +77,32 @@ export function renderLast(
   if (best !== undefined) {
     lines.push(T.lastBest(format1RM(best)));
   }
-  return lines.join('\n');
+
+  // El histórico completo ya está cargado: es exactamente lo que detectStagnation
+  // necesita, así que el insight más valioso del producto (SPEC §5) no cuesta ni
+  // una consulta más y aparece cuando el usuario decide el peso de hoy.
+  //
+  // detectStagnation espera createdAt: Date, pero SetRow.createdAt es epoch ms:
+  // se mapea aquí, respetando el isWarmup real de cada serie (detectStagnation
+  // aplica su propio effectiveSets() sobre lo que le pasemos).
+  const stagnation = detectStagnation(
+    sets.map((row) => ({ weightKg: row.weightKg, reps: row.reps, isWarmup: row.isWarmup, createdAt: new Date(row.createdAt) })),
+    { timeZone: params.timezone },
+  );
+  if (stagnation.stagnant) {
+    lines.push(T.lastStagnant(stagnation.weeksWithoutImprovement, format1RM(stagnation.record1RM)));
+  }
+
+  return { text: lines.join('\n'), sessions: sessionSeries(sets).length };
+}
+
+/** Una línea de un solo punto no informa de nada: sin dos sesiones, sin botón. */
+function detailKeyboard(exerciseId: number, detail: LastDetail): InlineKeyboard {
+  const keyboard = new InlineKeyboard();
+  if (detail.sessions >= 2) {
+    keyboard.text(T.lastChartButton, CB.chart(exerciseId));
+  }
+  return keyboard;
 }
 
 export function registerLast(bot: Bot<CustomContext>, db: DatabaseSync, config: { timezone: string }): void {
@@ -89,7 +129,51 @@ export function registerLast(bot: Bot<CustomContext>, db: DatabaseSync, config: 
       await ctx.reply(text, { reply_markup: keyboard });
       return;
     }
-    await ctx.reply(renderLast(db, { userId: ctx.user.id, exerciseId: match.exercise.id, timezone: config.timezone }));
+    const detail = renderLast(db, { userId: ctx.user.id, exerciseId: match.exercise.id, timezone: config.timezone });
+    await ctx.reply(detail.text, { reply_markup: detailKeyboard(match.exercise.id, detail) });
+  });
+
+  // Handler de la gráfica de /last. Se registra ANTES que
+  // bot.callbackQuery(/^pick:l:/, ...) porque, dentro de registerLast, el orden
+  // relativo entre estos dos no importa (ninguno hace de catch-all del otro),
+  // pero sí importa que ambos vayan antes del catch-all de capture.ts.
+  bot.callbackQuery(/^ch:\d+$/, async (ctx) => {
+    // Antes de renderizar: entre la pulsación y la foto hay render y subida, y sin
+    // esto la ruedita del botón gira hasta que acabe todo.
+    await ctx.answerCallbackQuery();
+    const exerciseId = Number((ctx.callbackQuery.data ?? '').slice('ch:'.length));
+    const exercise = getExerciseById(db, exerciseId);
+    if (!exercise) {
+      return;
+    }
+    await ctx.replyWithChatAction('upload_photo').catch(() => {});
+
+    const sets = listHistorySetsForExercise(db, { userId: ctx.user.id, exerciseId, excludeWorkoutId: 0 });
+    const points = sessionSeries(sets);
+    const buffer = await renderChart(
+      exercise1RMChart(points, {
+        locale: currentLocale(),
+        timeZone: config.timezone,
+        unit: unitLabel(),
+      }),
+    );
+    if (buffer === null) {
+      return; // el detalle se queda como está; ninguna foto, ningún error visible
+    }
+    const best = session1RM(sets);
+    try {
+      await ctx.replyWithPhoto(new InputFile(buffer, 'exercise-1rm.png'), {
+        caption: T.chartExerciseCaption(displayName(exercise), format1RM(best ?? 0)),
+      });
+    } catch (error) {
+      // El envío a Telegram puede fallar (red, chat bloqueado, payload rechazado)
+      // aunque el render haya ido bien. La ruedita ya se apagó y el detalle sigue
+      // intacto: este fallo no debe llegar al usuario como error genérico.
+      console.error('[last-chart] sendPhoto failed:', error);
+    }
+    // Acción de un solo uso sobre una pantalla transitoria: el estado "detalle sin
+    // botones" es el mismo con el que se pintaba antes de esta tarea.
+    await ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard() }).catch(() => {});
   });
 
   // Solo el origen 'l': los pick:c: son de la captura y deben llegar al catch-all
@@ -124,8 +208,10 @@ export function registerLast(bot: Bot<CustomContext>, db: DatabaseSync, config: 
         await ctx.editMessageText(text, { reply_markup: keyboard }).catch(() => {});
         return;
       }
-      const text = renderLast(db, { userId, exerciseId: action.exerciseId, timezone: config.timezone });
-      await ctx.editMessageText(text, { reply_markup: new InlineKeyboard() }).catch(() => {});
+      const detail = renderLast(db, { userId, exerciseId: action.exerciseId, timezone: config.timezone });
+      await ctx
+        .editMessageText(detail.text, { reply_markup: detailKeyboard(action.exerciseId, detail) })
+        .catch(() => {});
       await ctx.answerCallbackQuery();
       return;
     }

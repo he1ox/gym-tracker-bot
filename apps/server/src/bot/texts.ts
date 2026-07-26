@@ -174,6 +174,15 @@ export const T = {
   lastBest(weight: string): string {
     return t('lastBest', { weight, unit: unitLabel() });
   },
+  get lastChartButton(): string {
+    return t('lastChartButton');
+  },
+  lastStagnant(weeks: number, weight: string): string {
+    return t('lastStagnant', { count: weeks, weight, unit: unitLabel() });
+  },
+  chartExerciseCaption(name: string, weight: string): string {
+    return t('chartExerciseCaption', { name, weight, unit: unitLabel() });
+  },
 
   // Selector de ejercicios por grupo muscular
   get pickChooseGroup(): string {
