@@ -253,6 +253,9 @@ export const T = {
   get welcomeHelpButton(): string {
     return t('welcomeHelpButton');
   },
+  get welcomeChartButton(): string {
+    return t('welcomeChartButton');
+  },
   get welcomeBackButton(): string {
     return t('welcomeBackButton');
   },

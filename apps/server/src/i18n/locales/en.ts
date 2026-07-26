@@ -89,6 +89,7 @@ export const en = {
     welcomeRoutinesButton: '📋 My routines',
     welcomeHistoryButton: '📊 History',
     welcomeHelpButton: '❓ How it works',
+    welcomeChartButton: '📊 Week',
     welcomeBackButton: '‹ Back',
     welcomeGreeting: '👋 Hello',
     welcomeGreetingNamed: '👋 Hello, {{name}}',

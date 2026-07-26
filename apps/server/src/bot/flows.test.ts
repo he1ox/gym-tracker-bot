@@ -301,7 +301,7 @@ describe('welcome screen and discoverability', () => {
     expect(sent).toHaveLength(1);
     expect(String(sent[0]?.payload.text ?? '')).toContain('👋 Hola');
     expect(sent[0]?.payload.parse_mode).toBe('HTML');
-    expect(lastKeyboardDatas(outgoing, 'sendMessage')).toEqual(['wc:s', 'wc:r', 'wc:l', 'wc:h']);
+    expect(lastKeyboardDatas(outgoing, 'sendMessage')).toEqual(['wc:s', 'wc:r', 'wc:l', 'wc:h', 'wc:g']);
     // No se ha creado ningún entrenamiento por saludar.
     expect(getActiveWorkout(d, 1)).toBeUndefined();
     expect(getSession(d, 1)).toBeUndefined();
@@ -390,7 +390,7 @@ describe('welcome screen and discoverability', () => {
     const back = outgoing.filter((c) => c.method === 'editMessageText').at(-1);
     expect(String(back?.payload.text ?? '')).toContain('👋 Hola');
     expect(String(back?.payload.text ?? '')).toContain('Últimos 30 días'); // resumen incluido
-    expect(lastKeyboardDatas(outgoing, 'editMessageText')).toEqual(['wc:s', 'wc:r', 'wc:l', 'wc:h']);
+    expect(lastKeyboardDatas(outgoing, 'editMessageText')).toEqual(['wc:s', 'wc:r', 'wc:l', 'wc:h', 'wc:g']);
   });
 
   it('sends /help as a new message and leaves an ongoing workout untouched (§5)', async () => {

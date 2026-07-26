@@ -103,6 +103,7 @@ export const es = {
     welcomeRoutinesButton: '📋 Mis rutinas',
     welcomeHistoryButton: '📊 Historial',
     welcomeHelpButton: '❓ Cómo funciona',
+    welcomeChartButton: '📊 Semana',
     welcomeBackButton: '‹ Volver',
     welcomeGreeting: '👋 Hola',
     welcomeGreetingNamed: '👋 Hola, {{name}}',

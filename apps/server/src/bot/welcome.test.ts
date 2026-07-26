@@ -1,10 +1,22 @@
 import type { Overview } from '@gym-tracker/core';
-import { MIGRATIONS_DIR, createUser, openDatabase, runMigrations } from '@gym-tracker/db';
-import { beforeAll, describe, expect, it } from 'vitest';
+import {
+  MIGRATIONS_DIR,
+  createUser,
+  createWorkout,
+  insertSet,
+  openDatabase,
+  runMigrations,
+} from '@gym-tracker/db';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { setCurrent } from '../i18n/current';
 import { initI18n } from '../i18n/index';
-import { BOT_INFO, makeHarness } from './test-harness';
+import { BOT_INFO, callbackUpdate, makeHarness, outgoingCalls } from './test-harness';
 import { botCommands, escapeHtml, renderHelp, renderWelcome, setBotCommands } from './welcome';
+
+// El renderizador real abre un canvas y tarda; aquí solo importa QUÉ se envía.
+// El PNG de verdad lo cubre charts/render.test.ts.
+const renderChart = vi.hoisted(() => vi.fn(async () => Buffer.from('fake-png')));
+vi.mock('../charts/render', () => ({ renderChart }));
 
 // Los renders leen el idioma del estado global; estos tests no pasan por el
 // middleware de preferencias, así que lo fijan a mano.
@@ -48,11 +60,11 @@ describe('escapeHtml', () => {
 });
 
 describe('renderWelcome', () => {
-  it('greets by name and shows the four buttons', () => {
+  it('greets by name and shows the five buttons', () => {
     const { text, keyboard } = renderWelcome({ firstName: 'George', overview: FULL, weeklyVolume: [] });
     expect(text).toContain('👋 Hola, George');
     expect(text).toContain('Registra tus series desde aquí');
-    expect(datas({ text, keyboard })).toEqual(['wc:s', 'wc:r', 'wc:l', 'wc:h']);
+    expect(datas({ text, keyboard })).toEqual(['wc:s', 'wc:r', 'wc:l', 'wc:h', 'wc:g']);
   });
 
   it('drops the name when Telegram gives none', () => {
@@ -234,5 +246,24 @@ describe('setBotCommands', () => {
     expect(botCommands('en').map((c) => c.command)).toContain('settings');
     expect(botCommands('en').find((c) => c.command === 'help')?.description).toBe('How it works');
     expect(botCommands('es').find((c) => c.command === 'help')?.description).toBe('Cómo funciona');
+  });
+});
+
+describe('botón 📊 Semana', () => {
+  it('envía la gráfica como mensaje nuevo y conserva el botón', async () => {
+    const d = openDatabase(':memory:');
+    runMigrations(d, MIGRATIONS_DIR);
+    createUser(d, { telegramUserId: 111, timezone: 'UTC', locale: 'es', createdAt: 0 });
+    const w = createWorkout(d, { userId: 1, routineDayId: null, dayNameSnapshot: null, startedAt: Date.now() });
+    insertSet(d, { workoutId: w.id, exerciseId: 1, position: 1, weightKg: 60, reps: 8, rpe: null, restSeconds: null, isWarmup: false, createdAt: Date.now() });
+    const { bot, outgoing } = makeHarness(d, BOT_INFO, { allowedTelegramIds: [111], timezone: 'UTC' });
+
+    await bot.handleUpdate(callbackUpdate(1, 'wc:g', 700));
+
+    expect(outgoingCalls(outgoing, 'sendPhoto')).toHaveLength(1);
+    // La bienvenida NO se repinta ni se le quita el botón: es una entrada de menú
+    // permanente y ‹ Volver la reconstruye entera de todos modos.
+    expect(outgoingCalls(outgoing, 'editMessageText')).toHaveLength(0);
+    expect(outgoingCalls(outgoing, 'editMessageReplyMarkup')).toHaveLength(0);
   });
 });

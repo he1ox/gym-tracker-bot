@@ -36,6 +36,7 @@ export const CB = {
   wcRoutines: 'wc:r',
   wcHistory: 'wc:l',
   wcHelp: 'wc:h',
+  wcChart: 'wc:g',
   wcBack: 'wc:b',
   // Espacio de /settings. Como wc:*, estos NO pasan por parseCallback: sus handlers
   // usan filtros por cadena exacta y se registran ANTES del catch-all de capture.ts.

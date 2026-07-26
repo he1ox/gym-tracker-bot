@@ -13,6 +13,7 @@ import type { CustomContext } from './context';
 import { renderPicker } from './exercise-picker';
 import { renderRoutinesList } from './routines-wizard';
 import { formatTonnage, formatWeight, renderDayPicker } from './session-view';
+import { sendWeeklyChart } from './weekly-chart';
 import { T } from './texts';
 
 export interface WelcomeModel {
@@ -128,7 +129,8 @@ export function renderWelcome(model: WelcomeModel): Rendered {
     .text(T.welcomeRoutinesButton, CB.wcRoutines)
     .text(T.welcomeHistoryButton, CB.wcHistory)
     .row()
-    .text(T.welcomeHelpButton, CB.wcHelp);
+    .text(T.welcomeHelpButton, CB.wcHelp)
+    .text(T.welcomeChartButton, CB.wcChart);
 
   return { text, keyboard };
 }
@@ -206,6 +208,17 @@ export function registerWelcome(
     const picker = renderPicker({ view: 'groups' }, 'l', localizeGroups(listExercisesByMuscleGroup(db, ctx.user.id)));
     await edit(ctx, picker, false);
     await ctx.answerCallbackQuery();
+  });
+
+  // La ÚNICA pantalla de aquí que no edita el mensaje pulsado: una foto no se puede
+  // pintar sobre un mensaje de texto, así que va como mensaje nuevo. El botón se
+  // conserva tras usarlo (es una entrada de menú permanente); pulsarlo dos veces
+  // manda dos fotos, y es una acción explícita del usuario.
+  bot.callbackQuery(CB.wcChart, async (ctx) => {
+    // Antes de renderizar: si no, la ruedita del botón gira hasta que acabe todo.
+    await ctx.answerCallbackQuery();
+    await ctx.replyWithChatAction('upload_photo').catch(() => {});
+    await sendWeeklyChart(ctx, db, config.timezone);
   });
 }
 
