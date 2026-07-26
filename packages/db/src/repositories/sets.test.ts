@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { MIGRATIONS_DIR, openDatabase, runMigrations } from '../index';
 import { createUser } from './users';
 import { createWorkout, finishWorkout } from './workouts';
+import { createCustomExercise } from './exercises';
 import {
   insertSet,
   lastEffectiveSetForExercise,
+  listEffectiveSetsBetween,
   listHistorySetsForExercise,
   listSetsForWorkout,
   listSetsForWorkoutExercise,
@@ -71,5 +73,53 @@ describe('sets repository', () => {
     const history = listHistorySetsForExercise(d, { userId: 1, exerciseId: EX, excludeWorkoutId: current.id });
     expect(history).toHaveLength(1);
     expect(history[0]?.weightKg).toBe(60);
+  });
+});
+
+describe('listEffectiveSetsBetween', () => {
+  it('includes both boundaries and excludes what falls outside', () => {
+    const d = db();
+    const w = createWorkout(d, { userId: 1, routineDayId: null, dayNameSnapshot: null, startedAt: 0 });
+    add(d, w.id, { createdAt: 999 });
+    add(d, w.id, { createdAt: 1000 });
+    add(d, w.id, { createdAt: 2000 });
+    add(d, w.id, { createdAt: 2001 });
+
+    const rows = listEffectiveSetsBetween(d, { userId: 1, fromMs: 1000, toMs: 2000 });
+    expect(rows.map((r) => r.createdAt)).toEqual([1000, 2000]);
+  });
+
+  it('excludes warmup sets', () => {
+    const d = db();
+    const w = createWorkout(d, { userId: 1, routineDayId: null, dayNameSnapshot: null, startedAt: 0 });
+    add(d, w.id, { createdAt: 1000, isWarmup: true });
+    add(d, w.id, { createdAt: 1100, isWarmup: false });
+
+    const rows = listEffectiveSetsBetween(d, { userId: 1, fromMs: 0, toMs: 9999 });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.createdAt).toBe(1100);
+  });
+
+  it('isolates by user_id', () => {
+    const d = db();
+    createUser(d, { telegramUserId: 2, timezone: 'UTC', createdAt: 0 });
+    const mine = createWorkout(d, { userId: 1, routineDayId: null, dayNameSnapshot: null, startedAt: 0 });
+    const theirs = createWorkout(d, { userId: 2, routineDayId: null, dayNameSnapshot: null, startedAt: 0 });
+    add(d, mine.id, { createdAt: 1000, weightKg: 60 });
+    add(d, theirs.id, { createdAt: 1000, weightKg: 200 });
+
+    const rows = listEffectiveSetsBetween(d, { userId: 1, fromMs: 0, toMs: 9999 });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.weightKg).toBe(60);
+  });
+
+  it('joins the exercise name, including a custom one', () => {
+    const d = db();
+    const own = createCustomExercise(d, { userId: 1, name: 'Curl <martillo> & polea', muscleGroup: 'biceps' });
+    const w = createWorkout(d, { userId: 1, routineDayId: null, dayNameSnapshot: null, startedAt: 0 });
+    add(d, w.id, { createdAt: 1000, exerciseId: own.id });
+
+    const rows = listEffectiveSetsBetween(d, { userId: 1, fromMs: 0, toMs: 9999 });
+    expect(rows[0]?.exerciseName).toBe('Curl <martillo> & polea');
   });
 });

@@ -68,3 +68,22 @@ export function getWorkoutById(db: DatabaseSync, id: number): WorkoutRow | undef
 export function finishWorkout(db: DatabaseSync, params: { workoutId: number; finishedAt: number }): void {
   db.prepare('UPDATE workouts SET finished_at = ? WHERE id = ?').run(params.finishedAt, params.workoutId);
 }
+
+/**
+ * `started_at` de los entrenamientos del usuario en `[fromMs, toMs]`, ambos
+ * inclusive. Incluye los no terminados: un entrenamiento cuenta por haber
+ * empezado, tenga o no series efectivas (spec §3).
+ */
+export function listWorkoutStartsBetween(
+  db: DatabaseSync,
+  params: { userId: number; fromMs: number; toMs: number },
+): number[] {
+  const rows = db
+    .prepare(
+      `SELECT started_at FROM workouts
+        WHERE user_id = ? AND started_at >= ? AND started_at <= ?
+        ORDER BY started_at`,
+    )
+    .all(params.userId, params.fromMs, params.toMs) as unknown as Array<{ started_at: number }>;
+  return rows.map((r) => r.started_at);
+}

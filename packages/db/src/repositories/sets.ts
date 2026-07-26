@@ -116,3 +116,43 @@ export function listHistorySetsForExercise(
     .all(params.userId, params.exerciseId, params.excludeWorkoutId) as unknown as SetRowDb[];
   return rows.map(mapSet);
 }
+
+/** Misma forma que `OverviewSet` de `@gym-tracker/core`, para pasarlo sin mapear. */
+export interface EffectiveSetWithName {
+  createdAt: number;
+  weightKg: number;
+  reps: number;
+  exerciseName: string;
+}
+
+/**
+ * Series efectivas (`is_warmup = 0`) del usuario en `[fromMs, toMs]`, ambos
+ * inclusive, con el nombre del ejercicio ya unido. Se pide una sola vez sobre los
+ * 60 días completos; el reparto entre ventanas lo hace `buildOverview`.
+ */
+export function listEffectiveSetsBetween(
+  db: DatabaseSync,
+  params: { userId: number; fromMs: number; toMs: number },
+): EffectiveSetWithName[] {
+  const rows = db
+    .prepare(
+      `SELECT s.created_at, s.weight_kg, s.reps, e.name AS exercise_name
+         FROM sets s
+         JOIN workouts w ON w.id = s.workout_id
+         JOIN exercises e ON e.id = s.exercise_id
+        WHERE w.user_id = ? AND s.is_warmup = 0 AND s.created_at >= ? AND s.created_at <= ?
+        ORDER BY s.created_at`,
+    )
+    .all(params.userId, params.fromMs, params.toMs) as unknown as Array<{
+    created_at: number;
+    weight_kg: number;
+    reps: number;
+    exercise_name: string;
+  }>;
+  return rows.map((r) => ({
+    createdAt: r.created_at,
+    weightKg: r.weight_kg,
+    reps: r.reps,
+    exerciseName: r.exercise_name,
+  }));
+}
