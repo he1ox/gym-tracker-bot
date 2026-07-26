@@ -2,12 +2,13 @@ import {
   MIGRATIONS_DIR,
   createUser,
   createWorkout,
+  getExerciseById,
   insertSet,
   openDatabase,
   runMigrations,
 } from '@gym-tracker/db';
 import { describe, expect, it } from 'vitest';
-import { buildUserOverview } from './overview-service';
+import { buildUserSummary } from './overview-service';
 
 const DAY = 86_400_000;
 const TZ = 'America/Mexico_City'; // UTC-6 fijo: la aritmética del test es legible
@@ -42,12 +43,12 @@ function addSet(
   });
 }
 
-describe('buildUserOverview', () => {
+describe('buildUserSummary', () => {
   it('anchors the window to the start of the local day, not to the current time', () => {
     const d = baseDb();
     addSet(d, TODAY_START); // 00:00 local de hoy: dentro
     addSet(d, TODAY_START - 1); // un ms antes: ayer, también dentro (día 2 de 30)
-    const overview = buildUserOverview(d, { userId: 1, timezone: TZ, now: NOW });
+    const { overview } = buildUserSummary(d, { userId: 1, timezone: TZ, now: NOW });
     expect(overview.effectiveSets.current).toBe(2);
   });
 
@@ -55,7 +56,7 @@ describe('buildUserOverview', () => {
     const d = baseDb();
     addSet(d, TODAY_START - 29 * DAY); // primer instante de la ventana
     addSet(d, TODAY_START - 29 * DAY - 1); // un ms fuera: cae en la anterior
-    const overview = buildUserOverview(d, { userId: 1, timezone: TZ, now: NOW });
+    const { overview } = buildUserSummary(d, { userId: 1, timezone: TZ, now: NOW });
     expect(overview.effectiveSets.current).toBe(1);
     expect(overview.effectiveSets.previous).toBe(1);
   });
@@ -64,7 +65,7 @@ describe('buildUserOverview', () => {
     const d = baseDb();
     addSet(d, TODAY_START - 59 * DAY); // primer instante de la ventana anterior
     addSet(d, TODAY_START - 59 * DAY - 1); // fuera de las dos
-    const overview = buildUserOverview(d, { userId: 1, timezone: TZ, now: NOW });
+    const { overview } = buildUserSummary(d, { userId: 1, timezone: TZ, now: NOW });
     expect(overview.effectiveSets.current).toBe(0);
     expect(overview.effectiveSets.previous).toBe(1);
   });
@@ -73,7 +74,7 @@ describe('buildUserOverview', () => {
     const d = baseDb();
     addSet(d, TODAY_START, { isWarmup: true, weightKg: 200 });
     addSet(d, TODAY_START, { weightKg: 60, reps: 10 });
-    const overview = buildUserOverview(d, { userId: 1, timezone: TZ, now: NOW });
+    const { overview } = buildUserSummary(d, { userId: 1, timezone: TZ, now: NOW });
     expect(overview.effectiveSets.current).toBe(1);
     expect(overview.reps.current).toBe(10);
     expect(overview.tonnageKg.current).toBe(600);
@@ -82,7 +83,7 @@ describe('buildUserOverview', () => {
 
   it('returns an all-zero overview for a user with no data at all', () => {
     const d = baseDb();
-    const overview = buildUserOverview(d, { userId: 1, timezone: TZ, now: NOW });
+    const { overview } = buildUserSummary(d, { userId: 1, timezone: TZ, now: NOW });
     expect(overview.workouts.current).toBe(0);
     expect(overview.heaviest.exerciseName).toBeNull();
     expect(overview.tonnageKg.changePercent).toBeNull();
@@ -91,9 +92,23 @@ describe('buildUserOverview', () => {
   it('does not move between two sets recorded minutes apart', () => {
     const d = baseDb();
     addSet(d, TODAY_START + 3_600_000);
-    const first = buildUserOverview(d, { userId: 1, timezone: TZ, now: NOW });
-    const later = buildUserOverview(d, { userId: 1, timezone: TZ, now: NOW + 5 * 60_000 });
-    expect(later.effectiveSets).toEqual(first.effectiveSets);
-    expect(later.workouts).toEqual(first.workouts);
+    const first = buildUserSummary(d, { userId: 1, timezone: TZ, now: NOW });
+    const later = buildUserSummary(d, { userId: 1, timezone: TZ, now: NOW + 5 * 60_000 });
+    expect(later.overview.effectiveSets).toEqual(first.overview.effectiveSets);
+    expect(later.overview.workouts).toEqual(first.overview.workouts);
+  });
+
+  it('devuelve el volumen de la semana en curso junto al resumen', () => {
+    const d = baseDb();
+    const now = Date.UTC(2026, 6, 22, 10, 0, 0);
+    const w = createWorkout(d, { userId: 1, routineDayId: null, dayNameSnapshot: null, startedAt: now });
+    insertSet(d, { workoutId: w.id, exerciseId: 1, position: 1, weightKg: 60, reps: 8, rpe: null, restSeconds: null, isWarmup: false, createdAt: now });
+    insertSet(d, { workoutId: w.id, exerciseId: 1, position: 2, weightKg: 60, reps: 8, rpe: null, restSeconds: null, isWarmup: true, createdAt: now + 1 });
+
+    const summary = buildUserSummary(d, { userId: 1, timezone: 'UTC', now });
+
+    // El calentamiento no cuenta: la consulta ya filtra is_warmup = 0.
+    expect(summary.weeklyVolume).toEqual([{ group: getExerciseById(d, 1)!.muscleGroup, count: 1 }]);
+    expect(summary.overview.effectiveSets.current).toBe(1);
   });
 });

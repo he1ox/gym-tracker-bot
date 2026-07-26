@@ -2,7 +2,7 @@ import type { Overview } from '@gym-tracker/core';
 import { type Locale, listExercisesByMuscleGroup } from '@gym-tracker/db';
 import { type Api, type Bot, InlineKeyboard } from 'grammy';
 import type { DatabaseSync } from 'node:sqlite';
-import { buildUserOverview } from '../services/overview-service';
+import { buildUserSummary } from '../services/overview-service';
 import { withCurrent } from '../i18n/current';
 import { localizeGroups } from '../i18n/exercise-name';
 import { buildDayOptions } from '../services/session-service';
@@ -126,9 +126,10 @@ const HTML = { parse_mode: 'HTML' } as const;
 
 export function welcomeModel(db: DatabaseSync, ctx: CustomContext, timezone: string): WelcomeModel {
   const firstName = ctx.from?.first_name?.trim();
+  const summary = buildUserSummary(db, { userId: ctx.user.id, timezone, now: Date.now() });
   return {
     firstName: firstName === undefined || firstName === '' ? null : firstName,
-    overview: buildUserOverview(db, { userId: ctx.user.id, timezone, now: Date.now() }),
+    overview: summary.overview,
   };
 }
 
