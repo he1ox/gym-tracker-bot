@@ -1,9 +1,12 @@
 import type { ChartConfiguration, ScriptableContext } from 'chart.js';
 import type { SessionPoint } from '../services/exercise-sessions';
-import { COLORS, LABEL_FONT_SIZE, LINE_WIDTH, POINT_RADIUS, TICK_FONT_SIZE } from './theme';
+import { ACCENT_LINE_WIDTH, COLORS, LABEL_FONT_SIZE, LINE_WIDTH, POINT_RADIUS, TICK_FONT_SIZE } from './theme';
 
 /** Ventana del spec §4.3: las 12 sesiones más recientes. */
 export const MAX_SESSIONS = 12;
+
+/** Máximo de marcas de fecha en el eje X para evitar sobreposición. */
+const MAX_X_TICKS = 6;
 
 /**
  * Evolución del mejor 1RM estimado por sesión, con las récord marcadas.
@@ -36,7 +39,7 @@ export function exercise1RMChart(
           label: '1RM',
           data: window.map((point) => ({ x: point.at, y: point.best1RM })),
           borderColor: COLORS.accent,
-          borderWidth: Math.max(LINE_WIDTH, 3),
+          borderWidth: ACCENT_LINE_WIDTH,
           tension: 0.25,
           fill: true,
           // El degradado necesita el contexto del canvas, que solo existe al
@@ -48,8 +51,8 @@ export function exercise1RMChart(
               return 'transparent';
             }
             const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-            gradient.addColorStop(0, 'rgba(145,132,217,0.30)');
-            gradient.addColorStop(1, 'rgba(145,132,217,0)');
+            gradient.addColorStop(0, COLORS.accentGradientStart);
+            gradient.addColorStop(1, COLORS.accentGradientEnd);
             return gradient;
           },
           pointRadius: window.map((point) => (point.isRecord ? POINT_RADIUS : 0)),
@@ -69,7 +72,7 @@ export function exercise1RMChart(
           ticks: {
             color: COLORS.text,
             font: { size: TICK_FONT_SIZE },
-            maxTicksLimit: 6,
+            maxTicksLimit: MAX_X_TICKS,
             callback: (value) => axisDate.format(new Date(Number(value))),
           },
           grid: { color: COLORS.divider },

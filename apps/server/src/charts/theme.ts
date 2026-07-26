@@ -13,6 +13,8 @@ export const COLORS = {
   barInBand: '#b5abfc',
   barOutOfBand: '#d4a15a',
   bandFill: 'rgba(145,132,217,0.13)',
+  accentGradientStart: 'rgba(145,132,217,0.30)',
+  accentGradientEnd: 'rgba(145,132,217,0)',
 } as const;
 
 // Telegram recomprime las fotos; con menos ancho las etiquetas se ven borrosas.
@@ -27,6 +29,7 @@ export const CHART_HEIGHT = 560;
 export const LABEL_FONT_SIZE = 18;
 export const TICK_FONT_SIZE = 16;
 export const LINE_WIDTH = 2;
+export const ACCENT_LINE_WIDTH = 3;
 export const POINT_RADIUS = 6;
 export const BAR_THICKNESS = 26;
 
