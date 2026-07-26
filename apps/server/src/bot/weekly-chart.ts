@@ -18,9 +18,10 @@ function shortDate(epochMs: number, timeZone: string): string {
 /**
  * Gráfica del volumen de la semana en curso, como MENSAJE NUEVO.
  *
- * Silenciosa por diseño en los dos caminos de «no hay foto»: semana sin series
- * efectivas (se da al cerrar un entrenamiento en el que no se registró nada) y
- * render fallido (`renderChart` devuelve `null`). Quien llama sigue con su texto.
+ * Silenciosa por diseño en los tres caminos de «no hay foto»: semana sin series
+ * efectivas (se da al cerrar un entrenamiento en el que no se registró nada),
+ * render fallido (`renderChart` devuelve `null`) y envío a Telegram fallido (red,
+ * chat bloqueado, payload rechazado). Quien llama sigue con su texto.
  */
 export async function sendWeeklyChart(
   ctx: CustomContext,
@@ -42,7 +43,14 @@ export async function sendWeeklyChart(
 
   const { fromMs, toMs } = isoWeekRange(now, timezone);
   const total = weeklyVolume.reduce((sum, row) => sum + row.count, 0);
-  await ctx.replyWithPhoto(new InputFile(buffer, 'weekly-volume.png'), {
-    caption: T.chartWeeklyCaption(shortDate(fromMs, timezone), shortDate(toMs, timezone), total),
-  });
+  try {
+    await ctx.replyWithPhoto(new InputFile(buffer, 'weekly-volume.png'), {
+      caption: T.chartWeeklyCaption(shortDate(fromMs, timezone), shortDate(toMs, timezone), total),
+    });
+  } catch (error) {
+    // El envío a Telegram puede fallar (red, chat bloqueado, payload rechazado)
+    // aunque el render haya ido bien. La foto es un extra decorativo sobre un
+    // cierre YA exitoso: su fallo no debe llegar al usuario como error genérico.
+    console.error('[weekly-chart] sendPhoto failed:', error);
+  }
 }

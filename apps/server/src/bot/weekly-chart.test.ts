@@ -6,9 +6,12 @@ import {
   openDatabase,
   runMigrations,
 } from '@gym-tracker/db';
+import { BotError, type Bot } from 'grammy';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { CustomContext } from './context';
 import { setCurrent } from '../i18n/current';
 import { initI18n } from '../i18n/index';
+import { isoWeekRange } from '../services/weekly-volume';
 import { BOT_INFO, callbackUpdate, commandUpdate, makeHarness, outgoingCalls, outgoingTexts, textUpdate } from './test-harness';
 
 // El renderizador real abre un canvas y tarda; aquí solo importa QUÉ se envía.
@@ -36,6 +39,27 @@ function db() {
   return d;
 }
 
+// Mismo formato que `shortDate` en weekly-chart.ts: día/mes en 2 dígitos.
+const shortDate = (epochMs: number) =>
+  new Intl.DateTimeFormat('es', { timeZone: 'UTC', day: '2-digit', month: '2-digit' }).format(new Date(epochMs));
+
+// grammY 1.45.1: `bot.handleUpdate` (singular) SIEMPRE relanza un `BotError` si el
+// middleware falla — nunca invoca `bot.errorHandler` (el handler de `bot.catch`); solo
+// el bucle interno de long polling lo hace (ver error-handling.test.ts, que documenta
+// el mismo contrato). Reproducimos aquí ese contrato para probar de verdad que un
+// `sendPhoto` fallido queda contenido en vez de escapar como excepción sin manejar.
+async function deliverUpdate(bot: Bot<CustomContext>, update: Parameters<Bot<CustomContext>['handleUpdate']>[0]): Promise<void> {
+  try {
+    await bot.handleUpdate(update);
+  } catch (err) {
+    if (err instanceof BotError) {
+      await bot.errorHandler(err);
+      return;
+    }
+    throw err;
+  }
+}
+
 describe('/finish', () => {
   it('envía el resumen y, después, la gráfica de la semana', async () => {
     const d = db();
@@ -51,7 +75,13 @@ describe('/finish', () => {
     expect(outgoingTexts(outgoing, 'editMessageText').join('\n')).toContain('Entrenamiento terminado');
     const photos = outgoingCalls(outgoing, 'sendPhoto');
     expect(photos).toHaveLength(1);
-    expect(String(photos[0]?.payload.caption ?? '')).toContain('Semana');
+    const caption = String(photos[0]?.payload.caption ?? '');
+    expect(caption).toContain('Semana');
+    // El rango completo, EN ORDEN: comprobar los dos fragmentos por separado no
+    // detectaría una transposición entre `shortDate(fromMs, ...)` y
+    // `shortDate(toMs, ...)` (los dos seguirían "presentes" aunque invertidos).
+    const { fromMs, toMs } = isoWeekRange(Date.now(), 'UTC');
+    expect(caption).toContain(`${shortDate(fromMs)} – ${shortDate(toMs)}`);
     // La foto va DESPUÉS del resumen: el chat queda con el texto y su gráfica.
     const methods = outgoing.map((c) => c.method);
     expect(methods.indexOf('sendPhoto')).toBeGreaterThan(methods.indexOf('editMessageText'));
@@ -71,6 +101,24 @@ describe('/finish', () => {
 
     expect(outgoingTexts(outgoing, 'editMessageText').join('\n')).toContain('Entrenamiento terminado');
     expect(outgoingCalls(outgoing, 'sendPhoto')).toHaveLength(0);
+  });
+
+  it('traga el fallo de sendPhoto: el resumen llega y no aparece el error genérico', async () => {
+    const d = db();
+    // El harness simula que la propia llamada a Telegram falla (red, chat
+    // bloqueado…), aunque el render haya funcionado. Sin guardia, esto se cuela
+    // en el bot.catch global y responde "Algo salió mal" tras un cierre ya exitoso.
+    const { bot, outgoing } = makeHarness(d, BOT_INFO, CONFIG, 'sendPhoto');
+    await bot.handleUpdate(commandUpdate(1, 'start'));
+    await bot.handleUpdate(callbackUpdate(2, 'free', MSG));
+    await bot.handleUpdate(callbackUpdate(3, 'ex:1', MSG));
+    await bot.handleUpdate(textUpdate(4, '60x8'));
+    outgoing.length = 0;
+
+    await deliverUpdate(bot, commandUpdate(5, 'finish'));
+
+    expect(outgoingTexts(outgoing, 'editMessageText').join('\n')).toContain('Entrenamiento terminado');
+    expect(outgoingTexts(outgoing, 'sendMessage').join('\n')).not.toContain('Algo salió mal');
   });
 
   it('no envía foto al cerrar un entrenamiento sin series', async () => {
