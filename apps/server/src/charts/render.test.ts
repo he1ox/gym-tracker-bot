@@ -55,7 +55,27 @@ describe('renderChart', () => {
     errors.mockRestore();
   });
 
+  it('ignora responsive/animation del caller: el render headless nunca se desactiva', async () => {
+    // `responsive: false` y `animation: false` son invariantes, no valores por defecto:
+    // un caller que pase lo contrario no debe poder reactivarlos, porque sin ellos
+    // Chart.js no funciona en este entorno sin DOM.
+    const buffer = await renderChart({
+      type: 'bar',
+      data: { labels: ['A', 'B'], datasets: [{ data: [1, 2] }] },
+      // Chart.js solo admite `false` o un objeto de configuración para `animation`
+      // (nunca `true`); un objeto no vacío es lo más parecido a «animación activada».
+      options: { responsive: true, animation: { duration: 400 } },
+    });
+
+    expect(buffer).not.toBeNull();
+    expect(pngSize(buffer as Buffer)).toEqual({ width: CHART_WIDTH, height: CHART_HEIGHT });
+  });
+
   it('pinta el fondo de COLORS.bg incluso donde Chart.js no dibuja nada', async () => {
+    // Excepción deliberada, solo en el test: `render.ts` es el único fichero de
+    // producción que debe importar skia-canvas, pero aquí necesitamos decodificar
+    // el PNG resultante para leer un píxel, y no hay otro decodificador permitido
+    // en el proyecto (solo chart.js y skia-canvas son dependencias válidas).
     const { Canvas, loadImage } = await import('skia-canvas');
     const buffer = await renderChart({
       type: 'bar',
@@ -80,5 +100,34 @@ describe('renderChart', () => {
     const pixel = ctx.getImageData(PROBE_X, PROBE_Y, 1, 1).data;
 
     expect(Array.from(pixel)).toEqual(hexToRgba(COLORS.bg));
+  });
+
+  it('no deja instancias huérfanas en el registro de Chart.js tras renders fallidos repetidos', async () => {
+    // Excepción deliberada, solo en el test (igual que el `import('skia-canvas')` de
+    // arriba): necesitamos inspeccionar el registro interno de Chart.js
+    // (`Chart.instances`), algo que `render.ts` no expone ni debe exponer. El módulo
+    // 'chart.js' ya está cacheado por Node desde la carga diferida de `renderChart`,
+    // así que este `Chart` es la misma instancia de clase y el mismo registro.
+    const { Chart } = await import('chart.js');
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const before = Object.keys(Chart.instances).length;
+    for (let i = 0; i < 5; i++) {
+      // Mismo fallo que el segundo test: tipo no registrado con dataset no vacío,
+      // para forzar que el CONSTRUCTOR de Chart.js lance (no un fallo posterior).
+      const buffer = await renderChart({
+        type: 'radar',
+        data: { labels: ['a'], datasets: [{ data: [1] }] },
+      });
+      expect(buffer).toBeNull();
+    }
+    const after = Object.keys(Chart.instances).length;
+
+    // Medido antes de esta corrección: cada construcción fallida dejaba una entrada
+    // huérfana (el registro crecía de 1 en 1, 5 veces). Con la limpieza en el catch
+    // de construcción, el registro vuelve al mismo tamaño que tenía antes.
+    expect(after).toBe(before);
+
+    errors.mockRestore();
   });
 });

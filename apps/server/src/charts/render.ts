@@ -52,8 +52,11 @@ const backgroundPlugin: Plugin = {
 };
 
 function withDefaults(config: ChartConfiguration): ChartConfiguration {
-  // `responsive: false` y `animation: false`: sin ellos Chart.js no funciona headless.
-  return { ...config, options: { responsive: false, animation: false, ...config.options } };
+  // `responsive: false` y `animation: false` van AL FINAL del spread: sin ellos
+  // Chart.js no funciona headless, y no son negociables por quien llama. Si
+  // fueran primero, `...config.options` los pisaría en silencio y el caller
+  // podría reactivar animaciones o el modo responsive sin que nada avisara.
+  return { ...config, options: { ...config.options, responsive: false, animation: false } };
 }
 
 /**
@@ -72,10 +75,25 @@ export async function renderChart(config: ChartConfiguration): Promise<Buffer | 
     // `as unknown as`: el contexto de skia-canvas implementa la superficie que
     // Chart.js usa, pero no declara el tipo del DOM. Es el puente entre las dos
     // librerías y vive solo aquí.
-    const instance = new chart.Chart(context as unknown as CanvasRenderingContext2D, {
-      ...withDefaults(config),
-      plugins: [backgroundPlugin, ...(config.plugins ?? [])],
-    });
+    const renderContext = context as unknown as CanvasRenderingContext2D;
+
+    let instance: InstanceType<ChartModule['Chart']>;
+    try {
+      instance = new chart.Chart(renderContext, {
+        ...withDefaults(config),
+        plugins: [backgroundPlugin, ...(config.plugins ?? [])],
+      });
+    } catch (constructionError) {
+      // Medido: si el constructor lanza (p.ej. un tipo de gráfica no registrado),
+      // Chart.js ya ha metido la instancia a medio construir en su registro global
+      // ANTES del punto que lanza, así que no basta con el `finally` de abajo —
+      // nunca se llega a asignar `instance`. Sin este `getChart` + `destroy`, cada
+      // render fallido deja una entrada huérfana para siempre: la misma fuga que
+      // el resto de esta función evita.
+      chart.Chart.getChart(renderContext)?.destroy();
+      throw constructionError;
+    }
+
     try {
       // `await` aunque skia-canvas devolviera el buffer de forma síncrona.
       return await surface.toBuffer('png');
