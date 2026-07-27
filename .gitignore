@@ -3,4 +3,5 @@ dist/
 coverage/
 *.db
 .superpowers/
-.claude/worktrees/
+.claude/
+spike-chart.png
