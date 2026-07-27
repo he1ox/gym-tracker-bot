@@ -1,4 +1,4 @@
-import type { Bot } from 'grammy';
+import { BotError, type Bot } from 'grammy';
 import type { DatabaseSync } from 'node:sqlite';
 import { setCurrent } from '../i18n/current';
 import { initI18n } from '../i18n/index';
@@ -126,4 +126,24 @@ export function callbackUpdate(updateId: number, data: string, messageId: number
 /** Llamadas a un método concreto (sendPhoto, editMessageReplyMarkup…). */
 export function outgoingCalls(outgoing: readonly OutgoingCall[], method: string): OutgoingCall[] {
   return outgoing.filter((c) => c.method === method);
+}
+
+// grammY 1.45.1: `Bot.handleUpdate` (singular) SIEMPRE relanza un `BotError` si el
+// middleware falla — nunca invoca `bot.errorHandler` (el handler de `bot.catch`).
+// Solo el bucle interno de long polling (`handleUpdates`, plural — privado, el que
+// usa `bot.start()`) atrapa ese `BotError` y se lo pasa a `bot.errorHandler`. Para
+// probar en un test rápido y determinista que nuestro `bot.catch` realmente evita
+// que un fallo tumbe el polling en producción, reproducimos aquí ese mismo
+// contrato usando solo API pública de grammY (`bot.handleUpdate`, `BotError`,
+// `bot.errorHandler` — las tres son públicas en bot.d.ts).
+export async function deliverUpdate(bot: Bot<CustomContext>, update: Parameters<Bot<CustomContext>['handleUpdate']>[0]): Promise<void> {
+  try {
+    await bot.handleUpdate(update);
+  } catch (err) {
+    if (err instanceof BotError) {
+      await bot.errorHandler(err);
+      return;
+    }
+    throw err;
+  }
 }

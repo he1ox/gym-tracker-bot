@@ -6,13 +6,20 @@ import {
   openDatabase,
   runMigrations,
 } from '@gym-tracker/db';
-import { BotError, type Bot } from 'grammy';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CustomContext } from './context';
 import { setCurrent } from '../i18n/current';
 import { initI18n } from '../i18n/index';
 import { isoWeekRange } from '../services/weekly-volume';
-import { BOT_INFO, callbackUpdate, commandUpdate, makeHarness, outgoingCalls, outgoingTexts, textUpdate } from './test-harness';
+import {
+  BOT_INFO,
+  callbackUpdate,
+  commandUpdate,
+  deliverUpdate,
+  makeHarness,
+  outgoingCalls,
+  outgoingTexts,
+  textUpdate,
+} from './test-harness';
 
 // El renderizador real abre un canvas y tarda; aquí solo importa QUÉ se envía.
 // El PNG de verdad lo cubre charts/render.test.ts.
@@ -42,23 +49,6 @@ function db() {
 // Mismo formato que `shortDate` en weekly-chart.ts: día/mes en 2 dígitos.
 const shortDate = (epochMs: number) =>
   new Intl.DateTimeFormat('es', { timeZone: 'UTC', day: '2-digit', month: '2-digit' }).format(new Date(epochMs));
-
-// grammY 1.45.1: `bot.handleUpdate` (singular) SIEMPRE relanza un `BotError` si el
-// middleware falla — nunca invoca `bot.errorHandler` (el handler de `bot.catch`); solo
-// el bucle interno de long polling lo hace (ver error-handling.test.ts, que documenta
-// el mismo contrato). Reproducimos aquí ese contrato para probar de verdad que un
-// `sendPhoto` fallido queda contenido en vez de escapar como excepción sin manejar.
-async function deliverUpdate(bot: Bot<CustomContext>, update: Parameters<Bot<CustomContext>['handleUpdate']>[0]): Promise<void> {
-  try {
-    await bot.handleUpdate(update);
-  } catch (err) {
-    if (err instanceof BotError) {
-      await bot.errorHandler(err);
-      return;
-    }
-    throw err;
-  }
-}
 
 describe('/finish', () => {
   it('envía el resumen y, después, la gráfica de la semana', async () => {

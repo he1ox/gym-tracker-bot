@@ -151,3 +151,12 @@ describe('welcome callback space', () => {
     }
   });
 });
+
+describe('gráfica de /last: espacio ch:', () => {
+  it('no colisiona con day:, ex: o pick: — llegar al catch-all de capture.ts es un error de registro', () => {
+    // Igual que wc:*: su handler (registerLast, con filtro por regexp) se registra
+    // ANTES del catch-all de capture.ts. Si un ch: llegara hasta parseCallback,
+    // 'unknown' es la única respuesta segura — nunca confundirlo con otra acción.
+    expect(parseCallback(CB.chart(1))).toEqual({ type: 'unknown' });
+  });
+});

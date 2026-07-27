@@ -1,4 +1,3 @@
-import { BotError, type Bot } from 'grammy';
 import type { DatabaseSync } from 'node:sqlite';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { setCurrent } from '../i18n/current';
@@ -16,11 +15,11 @@ import {
   runMigrations,
 } from '@gym-tracker/db';
 import { renderLast } from './last';
-import type { CustomContext } from './context';
 import {
   BOT_INFO,
   callbackUpdate,
   commandUpdate,
+  deliverUpdate,
   lastKeyboardDatas,
   makeHarness,
   outgoingCalls,
@@ -59,23 +58,6 @@ function session(d: DatabaseSync, at: number, weightKg: number, reps: number) {
   const w = createWorkout(d, { userId: 1, routineDayId: null, dayNameSnapshot: null, startedAt: at });
   insertSet(d, { workoutId: w.id, exerciseId: EX, position: 1, weightKg, reps, rpe: null, restSeconds: null, isWarmup: false, createdAt: at });
   finishWorkout(d, { workoutId: w.id, finishedAt: at + 1 });
-}
-
-// grammY 1.45.1: `bot.handleUpdate` (singular) SIEMPRE relanza un `BotError` si el
-// middleware falla — nunca invoca `bot.errorHandler` (el handler de `bot.catch`); solo
-// el bucle interno de long polling lo hace (ver error-handling.test.ts, que documenta
-// el mismo contrato). Reproducimos aquí ese contrato para probar de verdad que un
-// `sendPhoto` fallido queda contenido en vez de escapar como excepción sin manejar.
-async function deliverUpdate(bot: Bot<CustomContext>, update: Parameters<Bot<CustomContext>['handleUpdate']>[0]): Promise<void> {
-  try {
-    await bot.handleUpdate(update);
-  } catch (err) {
-    if (err instanceof BotError) {
-      await bot.errorHandler(err);
-      return;
-    }
-    throw err;
-  }
 }
 
 describe('renderLast', () => {
