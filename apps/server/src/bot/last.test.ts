@@ -183,6 +183,8 @@ describe('botón 📈 Ver gráfica', () => {
     await deliverUpdate(bot, callbackUpdate(3, `ch:${EX}`, LAST_MSG));
 
     expect(outgoingTexts(outgoing, 'sendMessage').join('\n')).not.toContain('Algo salió mal');
+    // El detalle sigue intacto: el botón se mantiene para reintentar
+    expect(outgoingCalls(outgoing, 'editMessageReplyMarkup')).toHaveLength(0);
   });
 });
 

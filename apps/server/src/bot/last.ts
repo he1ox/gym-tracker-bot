@@ -170,6 +170,7 @@ export function registerLast(bot: Bot<CustomContext>, db: DatabaseSync, config: 
       // aunque el render haya ido bien. La ruedita ya se apagó y el detalle sigue
       // intacto: este fallo no debe llegar al usuario como error genérico.
       console.error('[last-chart] sendPhoto failed:', error);
+      return;
     }
     // Acción de un solo uso sobre una pantalla transitoria: el estado "detalle sin
     // botones" es el mismo con el que se pintaba antes de esta tarea.
