@@ -190,7 +190,8 @@ Flujo mínimo:
    - **Botones**: repetir la serie anterior, ajustar peso, ajustar reps.
    - **Texto libre**: `60x8`, procesado por el parser.
 5. Al terminar una serie, opcionalmente programa un aviso de descanso.
-6. `/finish` cierra la sesión, calcula el resumen y avisa de récords conseguidos.
+6. `/finish` cierra la sesión, calcula el resumen, avisa de récords conseguidos y envía la
+   gráfica del volumen de la semana por grupo muscular.
 
 ### Otros comandos
 
@@ -198,6 +199,8 @@ Flujo mínimo:
 - `/routines` — gestión de rutinas desde el bot (crear, editar días y ejercicios).
 - `/backup` — envía el archivo `.db` por Telegram.
 - `/last <ejercicio>` — consulta rápida del histórico reciente de un ejercicio.
+- `/stagnant` — ejercicios cuyo mejor 1RM estimado lleva 3 o más semanas entrenadas sin
+  superar su máximo previo.
 - `/settings` — idioma (español/inglés) y unidad de peso (kg/lb), además del salto de los
   botones de peso (1, 2.5, 5, 10).
 

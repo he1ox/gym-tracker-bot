@@ -112,3 +112,29 @@ Registro del porqué. El qué vive en `SPEC.md`; el diseño de cada fase en `doc
   frente a 404 de un nombre inventado). La imagen Docker de la Fase 4 puede basarse en Alpine;
   queda pendiente de esa fase comprobar que las fuentes del sistema (`fonts.conf` no trae
   ninguna) están disponibles también ahí.
+- **Las fotos no viajan en `/start`.** La bienvenida se repinta en el sitio con
+  `editMessageText`; una foto no se puede repintar, así que cada arranque dejaría una imagen
+  huérfana más desactualizada que la anterior. Además la semana ISO en curso sale casi vacía
+  los lunes —cuando más se pulsa `/start`— y el render más la subida se meten delante del
+  selector de día, que es lo primero que se hace de pie con el móvil en la mano. El raster va
+  a `/finish` (una foto por entrenamiento, no por arranque) y a botones explícitos.
+- **Bloques Unicode como COMPLEMENTO en el camino crítico, no como sustituto del raster.** La
+  bienvenida gana barras de texto (`█░│`) dentro de su `<pre>`: lectura visual inmediata con
+  cero dependencias y cero latencia. Contrapartida: la escala no dice nada por encima de 20 y
+  los glifos dependen de la fuente monoespaciada del cliente; si descuadran en uso real, se
+  retira el separador `│` y quedan las diez celdas a secas.
+- **La banda 10–20 pasa a `packages/core`.** Es una regla del SPEC §8.1, no una preferencia de
+  presentación, y tenerla declarada en el dashboard obligaba al bot a redeclararla, que es
+  justo lo que prohíbe el SPEC §7.
+- **Eje temporal en la gráfica de 1RM del bot, frente al reparto por índice del dashboard.**
+  Doce sesiones equiespaciadas harían que dos meses sin entrenar se vieran como una semana
+  normal. Se hace con `type: 'linear'` sobre epoch-ms y `ticks.callback` con
+  `Intl.DateTimeFormat`: la escala `time` de Chart.js exigiría `chartjs-adapter-date-fns` y
+  una librería de fechas, y la Fase 0 ya fijó que no entra ninguna. La divergencia con
+  `AreaChart.tsx` es consciente; corregir el dashboard es alcance de otra tarea.
+- **`/stagnant` incluye los ejercicios de peso corporal mientras el dashboard los excluye.**
+  El dashboard los filtra con un `isBodyweight` que solo existe en sus tipos mock: la tabla
+  `exercises` no tiene esa columna y el catálogo base trae dominadas y fondos. Añadirla es una
+  migración, fuera del alcance de esta fase; y para las dominadas con lastre el dato es útil,
+  porque el peso añadido sí progresa. Se revisa cuando el peso corporal sea un campo
+  almacenado.

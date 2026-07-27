@@ -73,8 +73,8 @@ pnpm vitest run --project web -t "heatmap"
 pnpm vitest --project web
 ```
 
-Referencia de lo que debe salir en verde ahora mismo: **338 tests en 47 archivos**
-(271 en `node`, 67 en `web`).
+Referencia de lo que debe salir en verde ahora mismo: **446 tests en 59 archivos**
+(384 en `node`, 62 en `web`).
 
 Los tests viven junto al código que prueban (`foo.ts` → `foo.test.ts`), no en un árbol
 `__tests__` aparte.
@@ -162,9 +162,9 @@ Los `*.db` están en `.gitignore`.
 
 ## 8. Convenciones
 
-**Idioma.** Conversación y documentos en español. Identificadores, nombres de archivo y
-comentarios de código en inglés. Textos de interfaz (bot y dashboard) en español. Mensajes
-de commit en inglés.
+**Idioma.** Conversación y documentos en español. Identificadores y nombres de archivo en
+inglés; comentarios de código en español. Textos de interfaz (bot y dashboard) en español.
+Mensajes de commit en inglés.
 
 **Commits.** Conventional Commits con ámbito: `feat(web):`, `fix(server):`, `docs(web):`.
 Se commitea cuando el autor lo pide, no automáticamente.
