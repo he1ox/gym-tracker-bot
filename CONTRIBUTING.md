@@ -1,45 +1,45 @@
-# Cómo trabajar en este proyecto
+# How to work on this project
 
-Guía operativa del monorepo: qué instalar, qué comandos existen, cómo correr los tests y
-cómo arrancar cada pieza. Para **qué** se construye y **por qué**, la fuente de verdad es
-[`SPEC.md`](SPEC.md); las desviaciones y sus contrapartidas están en
+Operational guide for the monorepo: what to install, what commands exist, how to run the
+tests and how to start each piece. For **what** is being built and **why**, the source of
+truth is [`SPEC.md`](SPEC.md); deviations and their trade-offs are in
 [`DECISIONS.md`](DECISIONS.md).
 
-## 1. Entorno
+## 1. Environment
 
-| Requisito | Versión | Dónde está fijado |
+| Requirement | Version | Where it's pinned |
 |---|---|---|
-| Node | 24 (mínimo 23.4.0) | `.nvmrc`, `engines` de `package.json` |
+| Node | 24 (minimum 23.4.0) | `.nvmrc`, `package.json` `engines` |
 | pnpm | 11.x | `pnpm-workspace.yaml` |
 
-`.npmrc` tiene `engine-strict=true`, así que una versión de Node por debajo del mínimo
-aborta la instalación en vez de avisar.
+`.npmrc` has `engine-strict=true`, so a Node version below the minimum aborts the
+install instead of just warning.
 
 ```bash
 pnpm install
 ```
 
-Instala todo el workspace y enlaza los paquetes internos (`workspace:*`). No hay paso de
-build: los paquetes se consumen directamente desde `src/` vía el campo `exports`.
+Installs the whole workspace and links the internal packages (`workspace:*`). There's no
+build step: packages are consumed directly from `src/` via the `exports` field.
 
-> Nota de entorno: en la máquina del autor pnpm está instalado global con npm, porque
-> `corepack` falla con EPERM. Si `pnpm` no está en el PATH: `npm i -g pnpm`.
+> Environment note: on the author's machine pnpm is installed globally with npm, because
+> `corepack` fails with EPERM. If `pnpm` isn't on the PATH: `npm i -g pnpm`.
 
-## 2. Mapa del repositorio
+## 2. Repository map
 
 ```
 apps/
-  server/    bot de Telegram (grammY, long polling) — @gym-tracker/server
-  web/       dashboard SPA (Vite + React) — @gym-tracker/web
+  server/    Telegram bot (grammY, long polling) — @gym-tracker/server
+  web/       web dashboard SPA (Vite + React) — @gym-tracker/web
 packages/
-  core/      lógica de dominio pura, cero dependencias — @gym-tracker/core
-  db/        esquema Drizzle, migraciones, repositorios — @gym-tracker/db
+  core/      pure domain logic, zero dependencies — @gym-tracker/core
+  db/        Drizzle schema, migrations, repositories — @gym-tracker/db
 docs/superpowers/
-  specs/     diseños aprobados, uno por fase
-  plans/     planes de implementación, uno por fase
+  specs/     approved designs, one per phase
+  plans/     implementation plans, one per phase
 ```
 
-Los comandos por paquete se lanzan con `--filter`:
+Per-package commands are run with `--filter`:
 
 ```bash
 pnpm --filter @gym-tracker/web <script>
@@ -48,83 +48,83 @@ pnpm --filter @gym-tracker/server <script>
 
 ## 3. Tests
 
-Un solo runner (Vitest 4) con **dos proyectos** declarados en `vitest.config.ts` raíz:
+A single runner (Vitest 4) with **two projects** declared in the root `vitest.config.ts`:
 
-| Proyecto | Entorno | Qué incluye |
+| Project | Environment | What it includes |
 |---|---|---|
 | `node` | node | `packages/*/src/**/*.test.ts`, `apps/server/src/**/*.test.ts` |
 | `web` | jsdom | `apps/web/src/**/*.test.{ts,tsx}` |
 
 ```bash
-# Toda la suite (los dos proyectos)
+# Whole suite (both projects)
 pnpm test
 
-# Solo un proyecto
+# Just one project
 pnpm vitest run --project node
 pnpm vitest run --project web
 
-# Un archivo concreto
+# A specific file
 pnpm vitest run apps/web/src/presenters/overview.test.ts
 
-# Filtrar por nombre de test
+# Filter by test name
 pnpm vitest run --project web -t "heatmap"
 
-# Modo watch mientras desarrollas
+# Watch mode while developing
 pnpm vitest --project web
 ```
 
-Referencia de lo que debe salir en verde ahora mismo: **446 tests en 59 archivos**
-(384 en `node`, 62 en `web`).
+Reference for what should currently pass green: **446 tests in 59 files**
+(384 in `node`, 62 in `web`).
 
-Los tests viven junto al código que prueban (`foo.ts` → `foo.test.ts`), no en un árbol
-`__tests__` aparte.
+Tests live next to the code they test (`foo.ts` → `foo.test.ts`), not in a separate
+`__tests__` tree.
 
-## 4. Comprobación de tipos
-
-```bash
-pnpm typecheck                                # los 4 workspaces (pnpm -r)
-pnpm --filter @gym-tracker/web typecheck      # uno solo
-```
-
-`tsconfig.base.json` está en modo estricto y tres opciones cambian cómo se escribe el
-código a diario:
-
-- **`noUncheckedIndexedAccess`** — indexar un array devuelve `T | undefined`. `arr[0]` hay
-  que comprobarlo antes de usarlo.
-- **`exactOptionalPropertyTypes`** — a una propiedad `rpe?: number` no se le puede asignar
-  `undefined`. Se omite la clave (spread condicional: `...(rpe === undefined ? {} : { rpe })`).
-- **`verbatimModuleSyntax`** — las importaciones de tipos van con `import type`.
-
-## 5. Arrancar el dashboard web
+## 4. Type checking
 
 ```bash
-pnpm --filter @gym-tracker/web dev       # dev server en http://localhost:5173
-pnpm --filter @gym-tracker/web build     # bundle de producción en apps/web/dist
-pnpm --filter @gym-tracker/web preview   # sirve el bundle ya construido
+pnpm typecheck                                # all 4 workspaces (pnpm -r)
+pnpm --filter @gym-tracker/web typecheck      # just one
 ```
 
-Hoy la SPA se alimenta de **datos ficticios** (`apps/web/src/data/mock.ts`): no necesita ni
-base de datos ni servidor. El generador produce series crudas que pasan por las funciones
-reales de `@gym-tracker/core`, así que las cifras son cálculos de verdad sobre datos falsos.
-Cuando exista la API HTTP solo cambia el origen de las series.
+`tsconfig.base.json` is in strict mode, and three options change how code is written day
+to day:
 
-Las cuatro pantallas son rutas de hash, navegables a mano:
+- **`noUncheckedIndexedAccess`** — indexing an array returns `T | undefined`. `arr[0]`
+  must be checked before use.
+- **`exactOptionalPropertyTypes`** — a `rpe?: number` property can't be assigned
+  `undefined`. Omit the key instead (conditional spread: `...(rpe === undefined ? {} : { rpe })`).
+- **`verbatimModuleSyntax`** — type imports use `import type`.
+
+## 5. Starting the web dashboard
+
+```bash
+pnpm --filter @gym-tracker/web dev       # dev server at http://localhost:5173
+pnpm --filter @gym-tracker/web build     # production bundle in apps/web/dist
+pnpm --filter @gym-tracker/web preview   # serves the already-built bundle
+```
+
+Today the SPA is fed by **fake data** (`apps/web/src/data/mock.ts`): it needs neither a
+database nor a server. The generator produces raw series that pass through the real
+`@gym-tracker/core` functions, so the figures are real calculations over fake data. Once
+the HTTP API exists, only the series' origin changes.
+
+The four screens are hash routes, navigable by hand:
 
 ```
 #/overview    #/sessions    #/routines    #/exercise/<id>
 ```
 
-## 6. Arrancar el bot de Telegram
+## 6. Starting the Telegram bot
 
-Necesita configuración por variables de entorno. `apps/server/src/config.ts` las valida al
-arrancar y aborta con un mensaje claro si falta alguna:
+Needs configuration via environment variables. `apps/server/src/config.ts` validates them
+on startup and aborts with a clear message if any is missing:
 
-| Variable | Obligatoria | Qué es |
+| Variable | Required | What it is |
 |---|---|---|
-| `TELEGRAM_BOT_TOKEN` | sí | Token del bot que da @BotFather |
-| `ALLOWED_TELEGRAM_IDS` | sí | Ids de usuario de Telegram autorizados, separados por comas |
-| `TIMEZONE` | no | Zona IANA; por defecto la del sistema |
-| `DB_PATH` | no | Ruta del SQLite; por defecto el directorio de datos del SO |
+| `TELEGRAM_BOT_TOKEN` | yes | Bot token from @BotFather |
+| `ALLOWED_TELEGRAM_IDS` | yes | Authorized Telegram user ids, comma-separated |
+| `TIMEZONE` | no | IANA zone; defaults to the system's |
+| `DB_PATH` | no | SQLite path; defaults to the OS's data directory |
 
 ```bash
 # PowerShell
@@ -135,87 +135,91 @@ pnpm --filter @gym-tracker/server start
 TELEGRAM_BOT_TOKEN=… ALLOWED_TELEGRAM_IDS=123456789 pnpm --filter @gym-tracker/server start
 ```
 
-`main.ts` crea el directorio de la base de datos, abre el SQLite y **aplica las migraciones
-pendientes solo** antes de levantar el long polling. No hay paso manual de migración al
-arrancar.
+`main.ts` creates the database directory, opens the SQLite file and **applies only the
+pending migrations** before starting long polling. There's no manual migration step at
+startup.
 
-El runner de desarrollo es `tsx` (no `node src/main.ts`): el código usa imports sin
-extensión, que Node ESM no resuelve. El runtime del binario final se decide en la Fase 4.
+The dev runner is `tsx` (not `node src/main.ts`): the code uses extension-less imports,
+which Node ESM doesn't resolve. The final binary's runtime is decided in Phase 4.
 
-## 7. Base de datos y migraciones
+## 7. Database and migrations
 
-El esquema se escribe en `packages/db/src/schema.ts` y las migraciones se **generan**, no se
-escriben a mano:
+The schema is written in `packages/db/src/schema.ts` and migrations are **generated**,
+not hand-written:
 
 ```bash
 pnpm --filter @gym-tracker/db generate    # drizzle-kit generate
 ```
 
-Eso deja un `.sql` nuevo en `packages/db/drizzle/` y actualiza `meta/_journal.json`. Ambos
-se commitean. Las migraciones se aplican solas al arrancar el servidor (§6).
+That leaves a new `.sql` file in `packages/db/drizzle/` and updates `meta/_journal.json`.
+Both get committed. Migrations apply themselves on server startup (§6).
 
-**Prohibido `better-sqlite3`** ni ningún módulo nativo que exija compilar en la máquina del
-usuario (SPEC §3): se usa `node:sqlite`. De ahí el `ExperimentalWarning` de SQLite en la
-salida de los tests, silenciado de forma dirigida con `execArgv` en `vitest.config.ts`.
+**`better-sqlite3` is forbidden**, along with any native module that requires compiling on
+the user's machine (SPEC §3): `node:sqlite` is used instead. Hence the SQLite
+`ExperimentalWarning` in the test output, deliberately silenced with `execArgv` in
+`vitest.config.ts`.
 
-Los `*.db` están en `.gitignore`.
+`*.db` files are in `.gitignore`.
 
-## 8. Convenciones
+## 8. Conventions
 
-**Idioma.** Conversación y documentos en español. Identificadores y nombres de archivo en
-inglés; comentarios de código en español. Textos de interfaz (bot y dashboard) en español.
-Mensajes de commit en inglés.
+**Language.** Conversation and documents in Spanish. Identifiers and file names in
+English; code comments in Spanish. Interface text (bot and dashboard) in Spanish.
+Commit messages in English.
 
-**Commits.** Conventional Commits con ámbito: `feat(web):`, `fix(server):`, `docs(web):`.
-Se commitea cuando el autor lo pide, no automáticamente.
+**Commits.** Conventional Commits with scope: `feat(web):`, `fix(server):`, `docs(web):`.
+Committed when the author asks for it, not automatically.
 
-**Dónde va la lógica.** `packages/core` tiene todas las fórmulas de negocio (tonelaje,
-series efectivas, 1RM estimado, récords, volumen semanal, estancamiento, descanso). Ni
-`apps/server` ni `apps/web` las reimplementan: el bot y el dashboard invocan exactamente la
-misma función. Si una cifra hace falta en los dos sitios, vive en `core`.
+**Where logic lives.** `packages/core` has all the business formulas (tonnage, effective
+sets, estimated 1RM, records, weekly volume, stagnation, rest). Neither `apps/server` nor
+`apps/web` reimplement them: the bot and the dashboard call exactly the same function. If
+a figure is needed in both places, it lives in `core`.
 
-**Los componentes no calculan.** En `apps/web`, cada pantalla tiene un *presenter* en
-`src/presenters/`: función pura que recibe datos de dominio y devuelve el modelo de vista ya
-formateado. Los componentes de `src/components/` reciben ese modelo y lo pintan. La prioridad
-de los tests está en los presenters.
+**Components don't calculate.** In `apps/web`, every screen has a *presenter* in
+`src/presenters/`: a pure function that receives domain data and returns the already
+formatted view model. Components in `src/components/` receive that model and render it.
+Test priority is on the presenters.
 
-**Grupos musculares.** Siempre el enum `MUSCLE_GROUPS` de `core` (17 valores) con
-`MUSCLE_GROUP_LABELS` para mostrar. Nunca cadenas sueltas.
+**Muscle groups.** Always the `MUSCLE_GROUPS` enum from `core` (17 values) with
+`MUSCLE_GROUP_LABELS` for display. Never loose strings.
 
-**Zona horaria.** Las funciones de `core` que la piden la reciben por parámetro. En el web
-sale de la constante única `TIME_ZONE` de `apps/web/src/config.ts`; en el server, de la
-config. Nunca literales repartidos.
+**Timezone.** `core` functions that need it receive it as a parameter. In the web app it
+comes from the single `TIME_ZONE` constant in `apps/web/src/config.ts`; in the server,
+from config. Never scattered literals.
 
-**Dependencias.** Cada dependencia nueva se justifica antes de añadirla (SPEC §12). El stack
-real, incluidas las cuatro desviaciones del original (Nocturne en vez de Tailwind/shadcn,
-SVG a mano en vez de Recharts, router propio en vez de react-router, `@import` de Google
-Fonts conservado), está en la tabla de SPEC §3 y razonado en `DECISIONS.md`.
+**Dependencies.** Every new dependency is justified before being added (SPEC §12). The
+actual stack, including the four deviations from the original (Nocturne instead of
+Tailwind/shadcn, hand-written SVG instead of Recharts, a custom router instead of
+react-router, the Google Fonts `@import` kept as-is), is in the SPEC §3 table and
+explained in `DECISIONS.md`.
 
-**Nada de funcionalidad inventada.** Si el spec no lo pide, no se implementa; ante una
-ambigüedad de producto, se pregunta al autor en vez de asumir.
+**No invented functionality.** If the spec doesn't ask for it, it doesn't get
+implemented; when a product ambiguity comes up, ask the author instead of assuming.
 
 ## 9. i18n
 
-Los textos del bot viven en `apps/server/src/i18n/locales/{es,en}.ts` y se resuelven con
-`i18next`. El idioma, la unidad y el salto de peso del update en curso están en el módulo
-global `apps/server/src/i18n/current.ts`, que rellena el middleware `bot/preferences.ts`.
+The bot's texts live in `apps/server/src/i18n/locales/{es,en}.ts` and are resolved with
+`i18next`. The language, unit and weight increment for the current update are in the
+global module `apps/server/src/i18n/current.ts`, populated by the `bot/preferences.ts`
+middleware.
 
-**Regla obligatoria:** cualquier código que genere texto FUERA del ciclo de vida de un update
-(un `setTimeout`, un cron, un webhook, una tarea diferida) debe capturar `snapshot()` cuando se
-programa y restaurarlo con `withCurrent()` cuando se ejecuta. `bot/rest-timer.ts` es el ejemplo.
-Sin eso, el mensaje puede salir en el idioma de otro usuario o de otro update.
+**Mandatory rule:** any code that generates text OUTSIDE an update's lifecycle (a
+`setTimeout`, a cron, a webhook, a deferred task) must capture `snapshot()` when it's
+scheduled and restore it with `withCurrent()` when it runs. `bot/rest-timer.ts` is the
+example. Without that, the message can come out in another user's language or another
+update's.
 
-Añadir un idioma: un fichero nuevo en `locales/`, una entrada en `LOCALES` (`i18n/index.ts`) y
-ampliar el `CHECK` de `users.locale` con una migración. El test `i18n/parity.test.ts` obliga a
-traducir el catálogo entero.
+To add a language: a new file in `locales/`, an entry in `LOCALES` (`i18n/index.ts`) and
+extend the `users.locale` `CHECK` with a migration. The `i18n/parity.test.ts` test forces
+the whole catalog to be translated.
 
-Cambiar de unidad NO convierte ningún peso: es solo una etiqueta.
+Changing units does NOT convert any weight: it's just a label.
 
-## 10. Antes de dar algo por terminado
+## 10. Before calling something done
 
 ```bash
 pnpm test && pnpm typecheck && pnpm --filter @gym-tracker/web build
 ```
 
-Los tres en verde, con la salida a la vista. Un cambio en la UI necesita además una pasada
-visual real en el navegador: los tests de jsdom no ven cómo queda.
+All three green, with the output visible. A UI change also needs a real visual pass in
+the browser: jsdom tests can't see how it actually looks.
