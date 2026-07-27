@@ -202,6 +202,7 @@ describe('renderHelp', () => {
       '/finish',
       '/routines',
       '/last',
+      '/stagnant',
       '/help',
     ]) {
       expect(text).toContain(needle);
@@ -211,7 +212,7 @@ describe('renderHelp', () => {
 });
 
 describe('setBotCommands', () => {
-  it('registers the six commands of the spec once per language, in order', async () => {
+  it('registers the seven commands of the spec once per language, in order', async () => {
     const d = openDatabase(':memory:');
     runMigrations(d, MIGRATIONS_DIR);
     createUser(d, { telegramUserId: 111, timezone: 'UTC', locale: 'es', createdAt: 0 });
@@ -228,6 +229,7 @@ describe('setBotCommands', () => {
       { command: 'finish', description: 'Finish the workout' },
       { command: 'routines', description: 'My routines' },
       { command: 'last', description: 'History of an exercise' },
+      { command: 'stagnant', description: 'Stalled exercises' },
       { command: 'help', description: 'How it works' },
       { command: 'settings', description: 'Language and units' },
     ]);
@@ -237,6 +239,7 @@ describe('setBotCommands', () => {
       { command: 'finish', description: 'Terminar el entrenamiento' },
       { command: 'routines', description: 'Mis rutinas' },
       { command: 'last', description: 'Historial de un ejercicio' },
+      { command: 'stagnant', description: 'Ejercicios estancados' },
       { command: 'help', description: 'Cómo funciona' },
       { command: 'settings', description: 'Idioma y unidades' },
     ]);

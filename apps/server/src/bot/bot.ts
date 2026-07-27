@@ -10,6 +10,7 @@ import { preferences } from './preferences';
 import { createRestTimers } from './rest-timer';
 import { registerRoutines } from './routines-wizard';
 import { registerSettings } from './settings';
+import { registerStagnant } from './stagnant';
 import { T } from './texts';
 import { registerWelcome } from './welcome';
 
@@ -35,6 +36,7 @@ export function createBot(
   // --- Todo lo que tenga callbacks propios va ANTES de registerCapture ---
   registerRoutines(bot, db, config);
   registerLast(bot, db, config);
+  registerStagnant(bot, db, config);
   // ANTES que registerCapture, que engancha un bot.on('callback_query:data')
   // genérico (capture.ts): cualquier handler de wc:* registrado después nunca se
   // ejecutaría. Es la misma trampa que obligó a meter el segmento de origen en el

@@ -168,3 +168,41 @@ export function listEffectiveSetsBetween(
     muscleGroup: r.muscle_group,
   }));
 }
+
+export interface UserEffectiveSet {
+  exerciseId: number;
+  weightKg: number;
+  reps: number;
+  createdAt: number;
+}
+
+/**
+ * Series efectivas de TODOS los ejercicios del usuario, para el análisis de
+ * estancamiento. Una sola consulta y agrupamiento en memoria en vez de recorrer
+ * ejercicio por ejercicio: el bucle traería el histórico completo de cada uno
+ * —decenas de miles de filas marshalladas por invocación— para calcular un máximo
+ * por semana. Los ejercicios con histórico son las claves del agrupamiento, así que
+ * tampoco hace falta una consulta que los liste.
+ */
+export function listEffectiveSetsForUser(db: DatabaseSync, userId: number): UserEffectiveSet[] {
+  const rows = db
+    .prepare(
+      `SELECT s.exercise_id, s.weight_kg, s.reps, s.created_at
+         FROM sets s
+         JOIN workouts w ON w.id = s.workout_id
+        WHERE w.user_id = ? AND s.is_warmup = 0
+        ORDER BY s.created_at`,
+    )
+    .all(userId) as unknown as Array<{
+    exercise_id: number;
+    weight_kg: number;
+    reps: number;
+    created_at: number;
+  }>;
+  return rows.map((r) => ({
+    exerciseId: r.exercise_id,
+    weightKg: r.weight_kg,
+    reps: r.reps,
+    createdAt: r.created_at,
+  }));
+}

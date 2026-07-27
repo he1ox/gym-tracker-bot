@@ -184,6 +184,20 @@ export const T = {
     return t('chartExerciseCaption', { name, weight, unit: unitLabel() });
   },
 
+  // /stagnant
+  get stagnantHeader(): string {
+    return t('stagnantHeader');
+  },
+  get stagnantNone(): string {
+    return t('stagnantNone');
+  },
+  get stagnantNotEnough(): string {
+    return t('stagnantNotEnough');
+  },
+  stagnantLine(params: { name: string; weeks: number; record: string; week: string; since: string }): string {
+    return t('stagnantLine', { ...params, unit: unitLabel() });
+  },
+
   // Selector de ejercicios por grupo muscular
   get pickChooseGroup(): string {
     return t('pickChooseGroup');
@@ -306,12 +320,15 @@ export const T = {
   },
 
   // Descripciones del menú ☰ (una clave por comando).
-  commandDescription(command: 'start' | 'finish' | 'routines' | 'last' | 'help' | 'settings'): string {
+  commandDescription(
+    command: 'start' | 'finish' | 'routines' | 'last' | 'stagnant' | 'help' | 'settings',
+  ): string {
     const keys = {
       start: 'commandStart',
       finish: 'commandFinish',
       routines: 'commandRoutines',
       last: 'commandLast',
+      stagnant: 'commandStagnant',
       help: 'commandHelp',
       settings: 'commandSettings',
     } as const;

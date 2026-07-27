@@ -7,6 +7,7 @@ import {
   insertSet,
   lastEffectiveSetForExercise,
   listEffectiveSetsBetween,
+  listEffectiveSetsForUser,
   listHistorySetsForExercise,
   listSetsForWorkout,
   listSetsForWorkoutExercise,
@@ -148,5 +149,21 @@ describe('listEffectiveSetsBetween', () => {
 
     expect(rows).toHaveLength(1);
     expect(rows[0]?.muscleGroup).toBe(getExerciseById(d, EX)!.muscleGroup);
+  });
+});
+
+describe('listEffectiveSetsForUser', () => {
+  it('lista las series efectivas de todos los ejercicios del usuario en una consulta', () => {
+    const d = db();
+    createUser(d, { telegramUserId: 222, timezone: 'UTC', locale: 'es', createdAt: 0 });
+    const mine = createWorkout(d, { userId: 1, routineDayId: null, dayNameSnapshot: null, startedAt: 0 });
+    const theirs = createWorkout(d, { userId: 2, routineDayId: null, dayNameSnapshot: null, startedAt: 0 });
+    insertSet(d, { workoutId: mine.id, exerciseId: 1, position: 1, weightKg: 60, reps: 8, rpe: null, restSeconds: null, isWarmup: false, createdAt: 1_000 });
+    insertSet(d, { workoutId: mine.id, exerciseId: 2, position: 2, weightKg: 40, reps: 10, rpe: null, restSeconds: null, isWarmup: true, createdAt: 1_100 });
+    insertSet(d, { workoutId: theirs.id, exerciseId: 1, position: 1, weightKg: 99, reps: 1, rpe: null, restSeconds: null, isWarmup: false, createdAt: 1_200 });
+
+    const rows = listEffectiveSetsForUser(d, 1);
+
+    expect(rows).toEqual([{ exerciseId: 1, weightKg: 60, reps: 8, createdAt: 1_000 }]);
   });
 });

@@ -79,6 +79,12 @@ export const es = {
     lastStagnant_other: '⚠️ {{count}} semanas sin superar {{weight}} {{unit}}',
     chartExerciseCaption: '📈 {{name}} · mejor 1RM {{weight}} {{unit}}',
 
+    // /stagnant
+    stagnantHeader: '⚠️ Ejercicios estancados',
+    stagnantLine: '{{name}}: {{weeks}} sem. sin superar {{record}} {{unit}} ({{week}}) · mejor desde entonces {{since}} {{unit}}',
+    stagnantNone: '✅ Ningún ejercicio estancado ahora mismo.',
+    stagnantNotEnough: 'Todavía no hay semanas entrenadas suficientes para juzgarlo. Vuelve cuando lleves unas cuantas.',
+
     // Selector de ejercicios por grupo muscular
     pickChooseGroup: 'Elige un grupo muscular:',
     pickSearchButton: '🔍 Buscar por nombre',
@@ -144,6 +150,7 @@ export const es = {
       '<code>/finish</code> — terminar el entrenamiento',
       '<code>/routines</code> — mis rutinas',
       '<code>/last</code> — historial de un ejercicio',
+      '<code>/stagnant</code> — ejercicios estancados',
       '<code>/help</code> — esta pantalla',
       '<code>/settings</code> — idioma y unidades',
     ].join('\n'),
@@ -161,6 +168,7 @@ export const es = {
     commandFinish: 'Terminar el entrenamiento',
     commandRoutines: 'Mis rutinas',
     commandLast: 'Historial de un ejercicio',
+    commandStagnant: 'Ejercicios estancados',
     commandHelp: 'Cómo funciona',
     commandSettings: 'Idioma y unidades',
 

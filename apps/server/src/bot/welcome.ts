@@ -223,7 +223,7 @@ export function registerWelcome(
 }
 
 /** El menú ☰ de Telegram (spec §6). El orden es el de la tabla del spec. */
-const COMMAND_ORDER = ['start', 'finish', 'routines', 'last', 'help', 'settings'] as const;
+const COMMAND_ORDER = ['start', 'finish', 'routines', 'last', 'stagnant', 'help', 'settings'] as const;
 
 export function botCommands(locale: Locale): Array<{ command: string; description: string }> {
   // Las descripciones salen del catálogo del idioma pedido, no del estado global:

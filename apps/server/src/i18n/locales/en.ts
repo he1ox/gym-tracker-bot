@@ -67,6 +67,12 @@ export const en = {
     lastStagnant_other: '⚠️ {{count}} weeks without beating {{weight}} {{unit}}',
     chartExerciseCaption: '📈 {{name}} · best 1RM {{weight}} {{unit}}',
 
+    // /stagnant
+    stagnantHeader: '⚠️ Stalled exercises',
+    stagnantLine: '{{name}}: {{weeks}} wk without beating {{record}} {{unit}} ({{week}}) · best since {{since}} {{unit}}',
+    stagnantNone: '✅ Nothing is stalled right now.',
+    stagnantNotEnough: 'Not enough trained weeks yet to judge it. Come back after a few more.',
+
     pickChooseGroup: 'Pick a muscle group:',
     pickSearchButton: '🔍 Search by name',
     pickBackButton: '‹ Back',
@@ -130,6 +136,7 @@ export const en = {
       '<code>/finish</code> — finish the workout',
       '<code>/routines</code> — my routines',
       '<code>/last</code> — history of an exercise',
+      '<code>/stagnant</code> — stalled exercises',
       '<code>/help</code> — this screen',
       '<code>/settings</code> — language and units',
     ].join('\n'),
@@ -145,6 +152,7 @@ export const en = {
     commandFinish: 'Finish the workout',
     commandRoutines: 'My routines',
     commandLast: 'History of an exercise',
+    commandStagnant: 'Stalled exercises',
     commandHelp: 'How it works',
     commandSettings: 'Language and units',
 
